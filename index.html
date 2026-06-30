@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gastos 2026 — Comercial Crédito</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --surface2: #22263a; --border: #2e3250;
+    --accent: #5b7fff; --accent2: #ff6b6b; --accent3: #51d88a; --accent4: #ffc94d;
+    --text: #e2e8f0; --muted: #8892a4;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; }
+
+  header {
+    background: linear-gradient(135deg, #1a1d27, #0f1117);
+    border-bottom: 1px solid var(--border);
+    padding: 18px 32px; display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  header h1 { font-size: 18px; font-weight: 700; color: #fff; }
+  header p { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .badge { background: var(--accent); color: #fff; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+  .badge.warn { background: var(--accent4); color: #000; }
+
+  main { max-width: 1440px; margin: 0 auto; padding: 24px 20px 60px; }
+
+  /* MODE TABS */
+  .mode-tabs { display: flex; gap: 8px; margin-bottom: 24px; }
+  .tab-btn {
+    padding: 8px 20px; border-radius: 8px; border: 1px solid var(--border);
+    background: transparent; color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: all .2s;
+  }
+  .tab-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .tab-btn:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
+
+  /* KPI */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px,1fr)); gap: 14px; margin-bottom: 24px; }
+  .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; position: relative; overflow: hidden; transition: transform .2s; }
+  .kpi:hover { transform: translateY(-2px); }
+  .kpi .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 6px; }
+  .kpi .val { font-size: 24px; font-weight: 800; color: #fff; }
+  .kpi .sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .kpi .bar { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; }
+  .kpi.blue .bar { background: var(--accent); }
+  .kpi.green .bar { background: var(--accent3); }
+  .kpi.red .bar { background: var(--accent2); }
+  .kpi.yellow .bar { background: var(--accent4); }
+
+  /* CONTROLS */
+  .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
+  .controls label { font-size: 12px; color: var(--muted); font-weight: 500; }
+  select, input[type="text"] {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    padding: 7px 11px; border-radius: 8px; font-size: 13px; outline: none; transition: border-color .2s;
+  }
+  select:focus, input:focus { border-color: var(--accent); }
+  .btn { background: var(--accent); color: #fff; border: none; padding: 7px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .btn.ghost { background: var(--surface2); color: var(--text); }
+  .btn.ghost:hover { background: var(--border); }
+
+  /* CHARTS */
+  .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 24px; }
+  @media (max-width: 860px) { .charts-grid { grid-template-columns: 1fr; } }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+  .card.wide { grid-column: 1 / -1; }
+  .card h3 { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 14px; }
+  .chart-wrap { position: relative; }
+
+  /* TABLE */
+  .tbl-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { background: var(--surface2); }
+  thead th { padding: 9px 12px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); white-space: nowrap; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; }
+  thead th:hover { color: var(--accent); }
+  tbody tr { border-bottom: 1px solid rgba(46,50,80,.4); transition: background .12s; cursor: pointer; }
+  tbody tr:hover { background: var(--surface2); }
+  tbody td { padding: 9px 12px; font-size: 12px; white-space: nowrap; }
+  .td-name { font-weight: 700; color: #fff; }
+  .chip { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+  .chip.ars { background: rgba(91,127,255,.15); color: var(--accent); }
+  .chip.usd { background: rgba(255,196,77,.15); color: var(--accent4); }
+  .mini-bar-wrap { display: flex; align-items: center; gap: 6px; }
+  .mini-bar { height: 5px; border-radius: 3px; min-width: 2px; }
+  .mini-bar.pto { background: var(--accent); }
+  .mini-bar.real { background: var(--accent3); }
+  .desvio { font-size: 11px; padding: 1px 5px; border-radius: 3px; font-weight: 700; }
+  .desvio.pos { background: rgba(255,107,107,.15); color: var(--accent2); }
+  .desvio.neg { background: rgba(81,216,138,.15); color: var(--accent3); }
+  .desvio.neu { color: var(--muted); }
+
+  /* DETAIL PANEL */
+  .detail-panel { margin-bottom: 24px; }
+  .concept-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+  .c-chip { padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; transition: all .2s; }
+  .c-chip:hover { border-color: var(--accent); color: var(--accent); }
+  .c-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* MONTH HEATMAP */
+  .month-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 5px; margin-bottom: 12px; }
+  @media (max-width: 700px) { .month-grid { grid-template-columns: repeat(6,1fr); } }
+  .m-cell { border-radius: 8px; padding: 10px 4px; text-align: center; transition: transform .15s; }
+  .m-cell:hover { transform: scale(1.06); z-index: 1; }
+  .m-cell .mn { font-size: 9px; font-weight: 700; color: rgba(255,255,255,.5); text-transform: uppercase; margin-bottom: 3px; }
+  .m-cell .mv { font-size: 11px; font-weight: 700; color: #fff; }
+  .m-cell .mr { font-size: 10px; color: var(--accent3); margin-top: 2px; }
+  .m-cell .md { font-size: 9px; margin-top: 1px; }
+
+  /* DEV CARDS */
+  .dev-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px,1fr)); gap: 14px; margin-bottom: 24px; }
+  .dev-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+  .dev-card h4 { font-size: 12px; font-weight: 700; color: #fff; margin-bottom: 10px; }
+  .dev-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid rgba(46,50,80,.35); font-size: 11px; }
+  .dev-row:last-child { border-bottom: none; }
+  .dev-row .dm { color: var(--muted); }
+  .dev-row .dv { font-weight: 600; }
+  .dev-row .dd { padding: 1px 5px; border-radius: 3px; font-weight: 700; font-size: 10px; }
+  .dd.up { background: rgba(255,107,107,.15); color: var(--accent2); }
+  .dd.dn { background: rgba(81,216,138,.15); color: var(--accent3); }
+
+  /* EDIT HINT */
+  .edit-hint { background: rgba(91,127,255,.08); border: 1px solid rgba(91,127,255,.25); border-radius: 10px; padding: 14px 18px; margin-bottom: 20px; font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .edit-hint strong { color: var(--accent); }
+
+  footer { text-align: center; padding: 20px; color: var(--muted); font-size: 11px; border-top: 1px solid var(--border); }
+  .section-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .section-hdr .title { font-size: 14px; font-weight: 700; color: #fff; }
+  .section-hdr .sub { font-size: 11px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Gastos 2026 — Comercial Crédito</h1>
+    <p id="headerSub">Presupuesto anual · Casa Central · Última actualización: <span id="lastUpdate">—</span></p>
+  </div>
+  <span class="badge warn" id="statusBadge">SIN REAL CARGADO</span>
+</header>
+
+<main>
+
+<!-- EDIT HINT -->
+<div class="edit-hint">
+  <strong>¿Cómo actualizar con datos reales del mes?</strong><br>
+  Al final del archivo, en la sección <strong>REAL_DATA</strong>, completá el valor mensual de cada concepto
+  a medida que lo obtenés del PowerBI. Dejá <code>null</code> en los meses que todavía no cerraron.
+  Los gráficos y desvíos se calculan automáticamente.
+</div>
+
+<!-- TABS -->
+<div class="mode-tabs">
+  <button class="tab-btn active" onclick="setMode('pto')">Presupuesto</button>
+  <button class="tab-btn" onclick="setMode('real')">Real</button>
+  <button class="tab-btn" onclick="setMode('desvio')">Presupuesto vs Real</button>
+</div>
+
+<!-- KPIs -->
+<div class="kpi-grid" id="kpiGrid"></div>
+
+<!-- CONTROLS -->
+<div class="controls">
+  <label>Cuenta:</label>
+  <select id="filterCuenta"><option value="">Todas</option></select>
+  <label>Moneda:</label>
+  <select id="filterMoneda">
+    <option value="">Todas</option>
+    <option value="ARS">ARS</option>
+    <option value="USD">USD</option>
+  </select>
+  <label>Buscar:</label>
+  <input type="text" id="searchInput" placeholder="concepto, tipo..." />
+  <button class="btn ghost" onclick="resetFilters()">Limpiar</button>
+</div>
+
+<!-- CHARTS -->
+<div class="charts-grid">
+  <div class="card wide">
+    <h3 id="chartMonthlyTitle">Consumo mensual total (ARS)</h3>
+    <div class="chart-wrap" style="height:240px"><canvas id="chartMonthly"></canvas></div>
+  </div>
+  <div class="card">
+    <h3>Distribución por concepto</h3>
+    <div class="chart-wrap" style="height:280px"><canvas id="chartDoughnut"></canvas></div>
+  </div>
+  <div class="card">
+    <h3>Ranking — Top conceptos</h3>
+    <div class="chart-wrap" style="height:280px"><canvas id="chartBar"></canvas></div>
+  </div>
+</div>
+
+<!-- TABLE -->
+<div class="section-hdr">
+  <div class="title">Detalle por concepto <span class="sub" id="rowCount"></span></div>
+</div>
+<div class="card" style="margin-bottom:24px;padding:0">
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr id="tableHead"></tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- DETAIL -->
+<div class="section-hdr">
+  <div class="title">Detalle mensual</div>
+</div>
+<div class="card detail-panel" style="margin-bottom:24px">
+  <div class="concept-chips" id="conceptChips"></div>
+  <div id="conceptDetail"></div>
+</div>
+
+<!-- DESVIOS -->
+<div class="section-hdr">
+  <div class="title">Desvíos vs. promedio mensual <span class="sub">(top 8 por monto)</span></div>
+</div>
+<div class="dev-grid" id="devGrid"></div>
+
+</main>
+<footer>Comercial Crédito 2026 · Datos: Planilla_Gastos_2026_Revisión_final_24.2 · Actualizar sección REAL_DATA con datos del PowerBI</footer>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════════
+// PRESUPUESTO 2026 — NO MODIFICAR (datos de la planilla)
+// ═══════════════════════════════════════════════════════════════════════════════
+const BUDGET = [
+  { concepto:'EVENTOS',              cuenta:'GASTOS COMERCIALES', tipo:'EVENTOS',                    moneda:'ARS', total:46200000, m:[0,700000,2000000,0,0,2000000,0,10000000,12000000,13000000,4000000,2500000],  desc:'Eventos nacionales. Pico ago-sep-oct.' },
+  { concepto:'MOVILIDAD EXTERIOR',   cuenta:'GASTOS COMERCIALES', tipo:'MOVILIDAD COMERCIAL',        moneda:'USD', total:9736434.5, m:[0,0,2677500,0,0,1861378.5,0,165276,3335280,1697000,0,0],                  desc:'Traslados al exterior (USD). Mar/Jun/Sep/Oct.' },
+  { concepto:'EVENTOS EXTERIOR',     cuenta:'GASTOS COMERCIALES', tipo:'EVENTOS',                    moneda:'USD', total:8221480,  m:[0,0,0,0,4318380,0,0,0,0,3903100,0,0],                                      desc:'Eventos internacionales. Mayo y Octubre.' },
+  { concepto:'MOVILIDAD COMERCIAL',  cuenta:'GASTOS COMERCIALES', tipo:'MOVILIDAD COMERCIAL',        moneda:'ARS', total:12550000, m:[100000,550000,850000,1300000,1300000,1300000,620000,1130000,1700000,1500000,1450000,750000], desc:'Movilidad nacional. Pico en septiembre.' },
+  { concepto:'MOVISTAR',             cuenta:'SERVICIOS TELEFONO', tipo:'SERVICIOS TELEFONO',         moneda:'ARS', total:11563434.33, m:[715764,754058,797416,841672,886702,934140,980847,1028909,1078297,1129516,1181473,1234640], desc:'Telefonía corporativa. Ajuste por inflación mensual.' },
+  { concepto:'ALMUERZOS COMERCIALES',cuenta:'GASTOS COMERCIALES', tipo:'ALMUERZOS / VARIOS',         moneda:'ARS', total:9500000,  m:[400000,250000,450000,500000,600000,600000,900000,1200000,1200000,1300000,1300000,800000], desc:'Almuerzos con clientes. Pico en 2do semestre.' },
+  { concepto:'HOTELES INTERIOR',     cuenta:'GASTOS COMERCIALES', tipo:'HOTEL',                      moneda:'ARS', total:6270000,  m:[0,900000,500000,700000,750000,600000,500000,450000,450000,500000,800000,120000], desc:'Hoteles en viajes nacionales.' },
+  { concepto:'MERCHANDISING',        cuenta:'GASTOS COMERCIALES', tipo:'MARKETING',                  moneda:'ARS', total:5750000,  m:[0,650000,0,800000,800000,0,1000000,0,1000000,0,1500000,0],               desc:'Marketing y materiales. Pico noviembre.' },
+  { concepto:'CAPACITACION',         cuenta:'CAPACITACION',       tipo:'CAPACITACION',               moneda:'ARS', total:7502062.92, m:[625172,625172,625172,625172,625172,625172,625172,625172,625172,625172,625172,625172], desc:'Cuotas iguales todo el año.' },
+  { concepto:'HORAS DC',             cuenta:'—',                  tipo:'—',                          moneda:'ARS', total:3495556.36, m:[30000,0,30000,0,30000,3315556,30000,0,30000,0,30000,0],                desc:'DataCenter. Gran concentración en junio (proyecto).' },
+  { concepto:'ALQUILER VEHICULO',    cuenta:'GASTOS COMERCIALES', tipo:'ALQUILER DE VEHICULOS',      moneda:'ARS', total:1980000,  m:[0,120000,180000,180000,150000,180000,200000,220000,150000,250000,250000,100000], desc:'Alquiler para visitas comerciales.' },
+  { concepto:'COMIDAS EXT.',         cuenta:'GASTOS COMERCIALES', tipo:'ALMUERZOS / VARIOS',         moneda:'USD', total:1919083.5, m:[0,0,0,0,0,485577,0,0,667056,509100,257351,0],                           desc:'Comidas exterior (USD). Jun/Sep/Oct/Nov.' },
+  { concepto:'HOTELES EXTERIOR',     cuenta:'GASTOS COMERCIALES', tipo:'HOTEL',                      moneda:'USD', total:1793500,  m:[0,0,945000,0,0,0,0,0,0,848500,0,0],                                      desc:'Hoteles exterior (USD). Marzo y Octubre.' },
+  { concepto:'DONACIONES',           cuenta:'—',                  tipo:'—',                          moneda:'ARS', total:1200000,  m:[0,0,0,0,0,0,0,0,0,1200000,0,0],                                         desc:'Donaciones institucionales. Solo octubre.' },
+  { concepto:'ANULACIONES EMISION',  cuenta:'ANULACION PRIMAS',   tipo:'ANULACION PRIMAS CREDITO',   moneda:'ARS', total:880000,   m:[0,80000,80000,80000,80000,80000,80000,80000,80000,80000,80000,80000],    desc:'Anulación de pólizas. Fijo mensual desde febrero.' },
+  { concepto:'COMBUSTIBLE',          cuenta:'GASTOS COMERCIALES', tipo:'COMBUSTIBLE AUTO ALQUILADO', moneda:'ARS', total:830000,   m:[120000,60000,60000,60000,60000,60000,80000,80000,80000,90000,80000,0],   desc:'Combustible vehículos alquilados.' },
+  { concepto:'ESTACIONAMIENTO',      cuenta:'GASTOS COMERCIALES', tipo:'ESTACIONAMIENTO',            moneda:'ARS', total:600000,   m:[0,40000,40000,50000,50000,50000,60000,60000,50000,70000,80000,50000],    desc:'Estacionamiento equipo comercial. Creciente.' },
+  { concepto:'REGALOS COMERCIALES',  cuenta:'GASTOS COMERCIALES', tipo:'REGALOS COMERCIALES',        moneda:'ARS', total:700000,   m:[0,0,400000,0,0,0,0,300000,0,0,0,0],                                     desc:'Regalos institucionales. Marzo y agosto.' },
+  { concepto:'TARJETAS',             cuenta:'GASTOS COMERCIALES', tipo:'IMPRESOS Y PAPELERIA',       moneda:'ARS', total:200000,   m:[0,100000,0,0,100000,0,0,0,0,0,0,0],                                     desc:'Tarjetas corporativas. Febrero y mayo.' },
+];
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// REAL 2026 — *** ACTUALIZAR CADA MES CON DATOS DEL POWERBI ***
+// Completar con el gasto real en ARS de cada concepto.
+// Dejar null = mes no cerrado todavía.
+// ═══════════════════════════════════════════════════════════════════════════════
+const REAL = {
+  // concepto                    Ene       Feb       Mar       Abr       May       Jun       Jul       Ago       Sep       Oct       Nov       Dic
+  'EVENTOS':                    [null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null],
+  'MOVILIDAD EXTERIOR':         [null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null],
+  'EVENTOS EXTERIOR':           [null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null],
+  'MOVILIDAD COMERCIAL':        [null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null],
+  'MOVISTAR':                   [null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null],
+  'ALMUERZOS COMERCIALES':      [null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null],
+  'HOTELES INTERIOR':           [null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null],
+  'MERCHANDISING':              [null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null],
+  'CAPACITACION':               [null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null],
+  'HORAS DC':                   [null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null],
+  'ALQUILER VEHICULO':          [null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null],
+  'COMIDAS EXT.':               [null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null],
+  'HOTELES EXTERIOR':           [null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null],
+  'DONACIONES':                 [null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null],
+  'ANULACIONES EMISION':        [null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null],
+  'COMBUSTIBLE':                [null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null],
+  'ESTACIONAMIENTO':            [null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null],
+  'REGALOS COMERCIALES':        [null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null],
+  'TARJETAS':                   [null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null,     null],
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ENGINE — no modificar
+// ═══════════════════════════════════════════════════════════════════════════════
+const MN = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const MF = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+// merge real into budget
+const DATA = BUDGET.map(b => ({
+  ...b,
+  real: REAL[b.concepto] || Array(12).fill(null)
+}));
+
+const GRAND_PTO = DATA.reduce((s,d)=>s+d.total,0);
+
+// detect last updated month
+function lastClosedMonth() {
+  let last = -1;
+  DATA.forEach(d => d.real.forEach((v,i) => { if (v !== null) last = Math.max(last, i); }));
+  return last;
+}
+const LAST_M = lastClosedMonth();
+
+function hasReal() { return LAST_M >= 0; }
+
+// ─── utils
+function fmt(n) {
+  if (n == null) return '—';
+  return new Intl.NumberFormat('es-AR', {minimumFractionDigits:0, maximumFractionDigits:0}).format(n);
+}
+function fmtM(n) {
+  if (n == null || n === 0) return '—';
+  const a = Math.abs(n);
+  const s = n < 0 ? '-' : '';
+  if (a >= 1e6) return s+'$'+(a/1e6).toFixed(1)+'M';
+  if (a >= 1e3) return s+'$'+(a/1e3).toFixed(0)+'k';
+  return s+'$'+Math.round(a);
+}
+function getColor(i, a=1) {
+  const c = ['91,127,255','255,107,107','81,216,138','255,196,77','148,103,189','23,190,207','255,127,14','44,160,44','31,119,180','188,189,34','174,199,232','255,187,120','152,223,138','255,152,150','197,176,213','196,156,148','247,182,210','200,200,100','150,150,200'];
+  return `rgba(${c[i%c.length]},${a})`;
+}
+function heatColor(v, max) {
+  if (!v) return 'rgba(46,50,80,0.5)';
+  const r = v / (max || 1);
+  if (r < 0.3) return `rgba(81,216,138,${0.2+r*0.6})`;
+  if (r < 0.7) return `rgba(255,196,77,${0.25+r*0.4})`;
+  return `rgba(255,107,107,${0.3+r*0.5})`;
+}
+
+// ─── state
+let mode = 'pto'; // 'pto' | 'real' | 'desvio'
+let filtered = [...DATA];
+let sortKey = 'total', sortDir = -1;
+let selConcept = DATA[0].concepto;
+let charts = {};
+
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', ['pto','real','desvio'][i]===m));
+  buildKPIs(); buildCharts(); renderTable(); renderDetail(); buildDevCards();
+}
+
+// ─── init
+function init() {
+  // header
+  document.getElementById('lastUpdate').textContent = hasReal()
+    ? MF[LAST_M] + ' 2026'
+    : 'Sin datos reales aún';
+  document.getElementById('statusBadge').textContent = hasReal()
+    ? 'REAL hasta ' + MN[LAST_M]
+    : 'SIN REAL CARGADO';
+  document.getElementById('statusBadge').className = hasReal() ? 'badge' : 'badge warn';
+
+  buildFilterOptions();
+  buildKPIs();
+  buildCharts();
+  buildConceptChips();
+  renderTable();
+  renderDetail();
+  buildDevCards();
+}
+
+// ─── KPIs
+function buildKPIs() {
+  const totalPto = DATA.reduce((s,d)=>s+d.total,0);
+  const meses = LAST_M >= 0 ? LAST_M+1 : 0;
+  const totalReal = DATA.reduce((s,d)=>s+d.real.slice(0,meses).reduce((a,v)=>a+(v||0),0),0);
+  const ptoCerrado = DATA.reduce((s,d)=>s+d.m.slice(0,meses).reduce((a,v)=>a+(v||0),0),0);
+  const desvioAbs = totalReal - ptoCerrado;
+  const devPct = ptoCerrado > 0 ? (desvioAbs/ptoCerrado*100).toFixed(1) : null;
+
+  const monthTotals = MN.map((_,i) => DATA.reduce((s,d)=>s+(d.m[i]||0),0));
+  const maxM = Math.max(...monthTotals);
+  const maxMName = MF[monthTotals.indexOf(maxM)];
+
+  let html = `
+    <div class="kpi blue"><div class="lbl">Presupuesto Total ARS</div><div class="val">$${(totalPto/1e6).toFixed(1)}M</div><div class="sub">${fmt(totalPto)} ARS</div><div class="bar"></div></div>
+    <div class="kpi ${desvioAbs>0?'red':'green'}"><div class="lbl">Real acumulado${meses>0?' ('+MF[LAST_M]+')':''}</div><div class="val">${meses>0?'$'+(totalReal/1e6).toFixed(1)+'M':'—'}</div><div class="sub">${meses>0?'Ppto: $'+(ptoCerrado/1e6).toFixed(1)+'M':' Sin datos reales'}</div><div class="bar"></div></div>
+    <div class="kpi ${desvioAbs>0?'red':'green'}"><div class="lbl">Desvío acumulado</div><div class="val">${devPct!==null?(desvioAbs>0?'+':'')+devPct+'%':'—'}</div><div class="sub">${desvioAbs!==0?fmtM(desvioAbs)+' ARS':'Sin datos'}</div><div class="bar"></div></div>
+    <div class="kpi red"><div class="lbl">Mes de mayor ppto</div><div class="val">${maxMName}</div><div class="sub">${fmtM(maxM)}</div><div class="bar"></div></div>
+    <div class="kpi blue"><div class="lbl">Promedio mensual</div><div class="val">${fmtM(totalPto/12)}</div><div class="sub">ppto / 12 meses</div><div class="bar"></div></div>
+  `;
+  document.getElementById('kpiGrid').innerHTML = html;
+}
+
+// ─── filters
+function buildFilterOptions() {
+  const cuentas = [...new Set(DATA.map(d=>d.cuenta))].sort();
+  const sel = document.getElementById('filterCuenta');
+  cuentas.forEach(c => { const o=document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o); });
+  sel.addEventListener('change', applyFilters);
+  document.getElementById('filterMoneda').addEventListener('change', applyFilters);
+  document.getElementById('searchInput').addEventListener('input', applyFilters);
+}
+function applyFilters() {
+  const cuenta = document.getElementById('filterCuenta').value;
+  const moneda = document.getElementById('filterMoneda').value;
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  filtered = DATA.filter(d => {
+    if (cuenta && d.cuenta !== cuenta) return false;
+    if (moneda && d.moneda !== moneda) return false;
+    if (q && !d.concepto.toLowerCase().includes(q) && !d.tipo.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  renderTable(); updateCharts();
+}
+function resetFilters() {
+  document.getElementById('filterCuenta').value='';
+  document.getElementById('filterMoneda').value='';
+  document.getElementById('searchInput').value='';
+  filtered=[...DATA]; renderTable(); updateCharts();
+}
+
+// ─── charts
+const CD = { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{ color:'#8892a4', font:{size:11} } } } };
+
+function getSeriesData(dataArr) {
+  if (mode==='pto') return MN.map((_,i)=>dataArr.reduce((s,d)=>s+(d.m[i]||0),0));
+  if (mode==='real') return MN.map((_,i)=>dataArr.reduce((s,d)=>s+(d.real[i]||0),0));
+  // desvio: real - pto
+  return MN.map((_,i)=>dataArr.reduce((s,d)=>{
+    const r=d.real[i], p=d.m[i]||0;
+    return s + (r!=null ? r-p : 0);
+  },0));
+}
+
+function buildCharts() {
+  const totals = getSeriesData(DATA);
+  const label = mode==='pto'?'Presupuesto':mode==='real'?'Real':'Desvío (Real - Ppto)';
+  document.getElementById('chartMonthlyTitle').textContent = label + ' mensual total (ARS)';
+
+  // destroy old
+  Object.values(charts).forEach(c=>c.destroy());
+  charts = {};
+
+  charts.monthly = new Chart(document.getElementById('chartMonthly').getContext('2d'), {
+    type:'bar',
+    data:{
+      labels: MF,
+      datasets:[{
+        label,
+        data: totals,
+        backgroundColor: mode==='desvio'
+          ? totals.map(v=>v>0?'rgba(255,107,107,0.7)':'rgba(81,216,138,0.7)')
+          : MN.map((_,i)=>getColor(i,0.7)),
+        borderRadius:4
+      }]
+    },
+    options:{...CD, scales:{
+      x:{ticks:{color:'#8892a4',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}},
+      y:{ticks:{color:'#8892a4',font:{size:10},callback:v=>fmtM(v)},grid:{color:'rgba(255,255,255,0.04)'}}
+    }, plugins:{...CD.plugins, tooltip:{callbacks:{label:ctx=>' $'+fmt(ctx.parsed.y)+' ARS'}}}}
+  });
+
+  const srcForDoughnut = mode==='real'
+    ? DATA.map(d=>({...d, _v: d.real.reduce((s,v)=>s+(v||0),0)}))
+    : DATA.map(d=>({...d, _v: d.total}));
+  const sorted8 = [...srcForDoughnut].sort((a,b)=>b._v-a._v).slice(0,8);
+  const other = srcForDoughnut.sort((a,b)=>b._v-a._v).slice(8).reduce((s,d)=>s+d._v,0);
+  const TOTAL_D = srcForDoughnut.reduce((s,d)=>s+d._v,0);
+
+  charts.doughnut = new Chart(document.getElementById('chartDoughnut').getContext('2d'), {
+    type:'doughnut',
+    data:{
+      labels:[...sorted8.map(d=>d.concepto),'OTROS'],
+      datasets:[{data:[...sorted8.map(d=>d._v),other], backgroundColor:[...sorted8.map((_,i)=>getColor(i,0.8)),'rgba(150,150,150,0.5)'], borderColor:'rgba(0,0,0,0.3)', borderWidth:1}]
+    },
+    options:{...CD, plugins:{...CD.plugins, tooltip:{callbacks:{label:ctx=>' '+ctx.label+': '+fmtM(ctx.parsed)+' ('+((ctx.parsed/TOTAL_D)*100).toFixed(1)+'%)'}}}}
+  });
+
+  const top10 = [...srcForDoughnut].sort((a,b)=>b._v-a._v).slice(0,10);
+  charts.bar = new Chart(document.getElementById('chartBar').getContext('2d'), {
+    type:'bar',
+    data:{labels:top10.map(d=>d.concepto), datasets:[{label, data:top10.map(d=>d._v), backgroundColor:top10.map((_,i)=>getColor(i,0.7)), borderRadius:4}]},
+    options:{...CD, indexAxis:'y', scales:{
+      x:{ticks:{color:'#8892a4',font:{size:10},callback:v=>fmtM(v)},grid:{color:'rgba(255,255,255,0.04)'}},
+      y:{ticks:{color:'#e2e8f0',font:{size:10}},grid:{display:false}}
+    }, plugins:{...CD.plugins, legend:{display:false}, tooltip:{callbacks:{label:ctx=>' $'+fmt(ctx.parsed.x)+' ARS'}}}}
+  });
+}
+
+function updateCharts() {
+  if (!charts.monthly) return;
+  const totals = getSeriesData(filtered);
+  charts.monthly.data.datasets[0].data = totals;
+  charts.monthly.update('none');
+}
+
+// ─── table
+function renderTable() {
+  const data = [...filtered].sort((a,b)=>{
+    const va=a[sortKey]??'', vb=b[sortKey]??'';
+    return (va<vb?-1:va>vb?1:0)*sortDir;
+  });
+  document.getElementById('rowCount').textContent = `(${data.length} conceptos)`;
+
+  const meses = LAST_M >= 0 ? LAST_M+1 : 0;
+  const showReal = hasReal();
+  const maxVal = Math.max(...data.map(d=>d.total));
+
+  // header
+  document.getElementById('tableHead').innerHTML = `
+    <th onclick="sort('concepto')">Concepto</th>
+    <th onclick="sort('cuenta')">Cuenta</th>
+    <th>Mon.</th>
+    <th onclick="sort('total')">Ppto Total</th>
+    ${showReal?`<th>Real ${meses>0?'('+MF[LAST_M]+')':''}</th><th>Desvío</th>`:''}
+    <th>%</th>
+    ${MN.map(m=>`<th>${m}</th>`).join('')}
+  `;
+
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = data.map(d => {
+    const realAcum = d.real.slice(0,meses).reduce((s,v)=>s+(v||0),0);
+    const ptoAcum  = d.m.slice(0,meses).reduce((s,v)=>s+(v||0),0);
+    const dev = ptoAcum > 0 ? ((realAcum-ptoAcum)/ptoAcum*100) : null;
+    const devCls = dev==null?'neu':dev>5?'pos':dev<-5?'neg':'neu';
+    const pct = (d.total/GRAND_PTO*100).toFixed(1);
+    const bw = Math.round(d.total/maxVal*70);
+
+    const mCells = d.m.map((v,i)=>{
+      const r = d.real[i];
+      if (mode==='pto') return `<td style="color:${v?'#e2e8f0':'#3a3f5c'}">${fmtM(v)}</td>`;
+      if (mode==='real') return `<td style="color:${r!=null?'#51d88a':'#3a3f5c'}">${r!=null?fmtM(r):'—'}</td>`;
+      const dv = r!=null ? r-(v||0) : null;
+      return `<td style="color:${dv==null?'#3a3f5c':dv>0?'#ff6b6b':'#51d88a'}">${dv!=null?(dv>0?'+':'')+fmtM(dv):'—'}</td>`;
+    }).join('');
+
+    return `<tr onclick="selectConcept('${d.concepto}')">
+      <td class="td-name">${d.concepto}</td>
+      <td style="color:var(--muted)">${d.cuenta}</td>
+      <td><span class="chip ${d.moneda.toLowerCase()}">${d.moneda}</span></td>
+      <td style="font-weight:700">$${fmt(d.total)}</td>
+      ${showReal?`<td style="color:var(--accent3);font-weight:600">${meses>0?'$'+fmt(realAcum):'—'}</td><td><span class="desvio ${devCls}">${dev!=null?(dev>0?'+':'')+dev.toFixed(1)+'%':'—'}</span></td>`:''}
+      <td><div class="mini-bar-wrap"><div class="mini-bar pto" style="width:${bw}px"></div><span style="color:var(--muted);font-size:10px">${pct}%</span></div></td>
+      ${mCells}
+    </tr>`;
+  }).join('');
+}
+
+function sort(k) {
+  if (sortKey===k) sortDir*=-1; else { sortKey=k; sortDir=-1; }
+  renderTable();
+}
+
+// ─── concept chips
+function buildConceptChips() {
+  document.getElementById('conceptChips').innerHTML = DATA.map(d=>
+    `<button class="c-chip ${d.concepto===selConcept?'active':''}" onclick="selectConcept('${d.concepto}')">${d.concepto}</button>`
+  ).join('');
+}
+
+function selectConcept(name) {
+  selConcept = name;
+  document.querySelectorAll('.c-chip').forEach(c=>c.classList.toggle('active', c.textContent===name));
+  renderDetail();
+}
+
+function renderDetail() {
+  const d = DATA.find(r=>r.concepto===selConcept); if(!d) return;
+  const ptoVals = d.m.filter(v=>v>0);
+  const avgPto = ptoVals.length ? ptoVals.reduce((s,v)=>s+v,0)/ptoVals.length : 0;
+  const maxPto = ptoVals.length ? Math.max(...ptoVals) : 0;
+  const realAcum = d.real.reduce((s,v)=>s+(v||0),0);
+  const ptoAcum  = d.m.reduce((s,v)=>s+(v||0),0);
+  const dev = ptoAcum>0 ? ((realAcum-ptoAcum)/ptoAcum*100).toFixed(1) : null;
+
+  const cells = d.m.map((v,i)=>{
+    const r = d.real[i];
+    const bg = heatColor(v, maxPto);
+    const devV = avgPto>0 ? ((v-avgPto)/avgPto*100) : 0;
+    const devStr = v>0 ? (devV>0?`+${devV.toFixed(0)}%`:`${devV.toFixed(0)}%`) : '';
+    const devColor = devV>20?'#ff6b6b':devV<-20?'#51d88a':'#ffc94d';
+    return `<div class="m-cell" style="background:${bg}">
+      <div class="mn">${MN[i]}</div>
+      <div class="mv">${fmtM(v)}</div>
+      ${r!=null?`<div class="mr">R: ${fmtM(r)}</div>`:''}
+      ${devStr?`<div class="md" style="color:${devColor}">${devStr}</div>`:''}
+    </div>`;
+  }).join('');
+
+  document.getElementById('conceptDetail').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:14px;margin-bottom:16px">
+      <div>
+        <div style="font-size:17px;font-weight:800;color:#fff">${d.concepto}</div>
+        <div style="color:var(--muted);font-size:11px;margin-top:3px">${d.cuenta} · ${d.tipo} · <span class="chip ${d.moneda.toLowerCase()}">${d.moneda}</span></div>
+        <div style="color:#a0aec0;font-size:12px;margin-top:8px;max-width:560px;line-height:1.5">${d.desc}</div>
+      </div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap">
+        <div style="text-align:center"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:3px">Ppto Anual</div><div style="font-size:18px;font-weight:800;color:#fff">$${fmt(d.total)}</div></div>
+        <div style="text-align:center"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:3px">Real Acum.</div><div style="font-size:18px;font-weight:800;color:var(--accent3)">${realAcum>0?'$'+fmt(realAcum):'—'}</div></div>
+        <div style="text-align:center"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:3px">Desvío</div><div style="font-size:18px;font-weight:800;color:${dev!=null&&parseFloat(dev)>0?'var(--accent2)':'var(--accent3)'}">${dev!=null?(parseFloat(dev)>0?'+':'')+dev+'%':'—'}</div></div>
+        <div style="text-align:center"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:3px">% del total</div><div style="font-size:18px;font-weight:800;color:var(--accent4)">${(d.total/GRAND_PTO*100).toFixed(1)}%</div></div>
+      </div>
+    </div>
+    <div class="month-grid">${cells}</div>
+    <div style="font-size:10px;color:var(--muted);margin-top:6px">
+      Color fondo = intensidad presupuesto · <span style="color:var(--accent3)">R: = real cargado</span> · % = desvío vs promedio mensual del ppto
+    </div>`;
+}
+
+// ─── dev cards
+function buildDevCards() {
+  const container = document.getElementById('devGrid');
+  const top8 = [...DATA].sort((a,b)=>b.total-a.total).slice(0,8);
+  container.innerHTML = top8.map(d=>{
+    const actives = d.m.filter(v=>v>0);
+    if (!actives.length) return '';
+    const avg = actives.reduce((s,v)=>s+v,0)/actives.length;
+    const rows = d.m.map((v,i)=>{
+      if (!v) return '';
+      const diff = v-avg;
+      const pct = (diff/avg*100).toFixed(0);
+      const r = d.real[i];
+      const realStr = r!=null ? ` <span style="color:var(--accent3);font-size:10px">(R:${fmtM(r)})</span>` : '';
+      return `<div class="dev-row">
+        <span class="dm">${MF[i]}</span>
+        <span class="dv">${fmtM(v)}${realStr}</span>
+        <span class="dd ${diff>0?'up':'dn'}">${diff>0?'+':''}${pct}%</span>
+      </div>`;
+    }).join('');
+    return `<div class="dev-card"><h4>${d.concepto} <span style="color:var(--muted);font-weight:400;font-size:11px">— prom. ${fmtM(avg)}/mes</span></h4>${rows}</div>`;
+  }).join('');
+}
+
+init();
+</script>
+</body>
+</html>
