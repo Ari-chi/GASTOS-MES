@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Informe de Gastos 2026 — Comercial Crédito</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3250;
+    --accent: #5b7fff;
+    --accent2: #ff6b6b;
+    --accent3: #51d88a;
+    --accent4: #ffc94d;
+    --text: #e2e8f0;
+    --muted: #8892a4;
+    --card-shadow: 0 4px 24px rgba(0,0,0,0.4);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; }
+
+  header {
+    background: linear-gradient(135deg, #1a1d27 0%, #0f1117 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 32px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  header h1 { font-size: 20px; font-weight: 700; color: #fff; }
+  header p { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .header-badge { background: var(--accent); color: #fff; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+
+  main { max-width: 1400px; margin: 0 auto; padding: 24px 24px 48px; }
+
+  /* KPI Cards */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 28px; }
+  .kpi-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px; position: relative; overflow: hidden;
+    transition: transform .2s, border-color .2s;
+    cursor: default;
+  }
+  .kpi-card:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .kpi-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 8px; }
+  .kpi-card .value { font-size: 26px; font-weight: 700; color: #fff; }
+  .kpi-card .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .kpi-card .accent-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; }
+  .kpi-card.blue .accent-bar { background: var(--accent); }
+  .kpi-card.red .accent-bar { background: var(--accent2); }
+  .kpi-card.green .accent-bar { background: var(--accent3); }
+  .kpi-card.yellow .accent-bar { background: var(--accent4); }
+
+  /* Controls */
+  .controls { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; align-items: center; }
+  .controls label { font-size: 12px; color: var(--muted); font-weight: 500; }
+  select, input[type="text"] {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    padding: 8px 12px; border-radius: 8px; font-size: 13px; outline: none;
+    transition: border-color .2s;
+  }
+  select:focus, input:focus { border-color: var(--accent); }
+  .btn {
+    background: var(--accent); color: #fff; border: none; padding: 8px 18px;
+    border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: background .2s, transform .1s;
+  }
+  .btn:hover { background: #4060ee; }
+  .btn:active { transform: scale(.97); }
+  .btn.secondary { background: var(--surface2); color: var(--text); }
+  .btn.secondary:hover { background: var(--border); }
+
+  /* Section headers */
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .section-title { font-size: 15px; font-weight: 700; color: #fff; }
+  .section-title span { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 8px; }
+
+  /* Charts grid */
+  .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 28px; }
+  @media (max-width: 900px) { .charts-grid { grid-template-columns: 1fr; } }
+  .chart-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px; box-shadow: var(--card-shadow);
+  }
+  .chart-card.wide { grid-column: 1 / -1; }
+  .chart-card h3 { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 16px; text-transform: uppercase; letter-spacing: .06em; }
+  .chart-wrapper { position: relative; }
+
+  /* Table */
+  .table-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 28px; box-shadow: var(--card-shadow); }
+  .table-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { background: var(--surface2); }
+  thead th {
+    padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+    white-space: nowrap; border-bottom: 1px solid var(--border);
+    cursor: pointer; user-select: none;
+  }
+  thead th:hover { color: var(--accent); }
+  thead th.sorted { color: var(--accent); }
+  tbody tr { border-bottom: 1px solid rgba(46,50,80,.5); transition: background .15s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--surface2); }
+  tbody td { padding: 10px 14px; font-size: 13px; white-space: nowrap; }
+  .td-concepto { font-weight: 600; color: #fff; }
+  .td-moneda { padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; background: rgba(91,127,255,.15); color: var(--accent); }
+  .td-moneda.usd { background: rgba(255,196,77,.15); color: var(--accent4); }
+  .bar-cell { display: flex; align-items: center; gap: 8px; }
+  .mini-bar { height: 6px; border-radius: 3px; background: var(--accent); min-width: 2px; transition: width .3s; }
+  .positive { color: var(--accent3); }
+  .negative { color: var(--accent2); }
+  .neutral { color: var(--muted); }
+
+  /* Monthly detail panel */
+  .detail-panel {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px; margin-bottom: 28px; box-shadow: var(--card-shadow);
+  }
+  .concept-selector { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  .concept-chip {
+    padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
+    border: 1px solid var(--border); background: transparent; color: var(--muted);
+    cursor: pointer; transition: all .2s;
+  }
+  .concept-chip:hover { border-color: var(--accent); color: var(--accent); }
+  .concept-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* Monthly heatmap */
+  .month-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 6px; margin-bottom: 20px; }
+  .month-cell {
+    border-radius: 8px; padding: 12px 8px; text-align: center;
+    transition: transform .2s; cursor: default; position: relative;
+  }
+  .month-cell:hover { transform: scale(1.05); z-index: 1; }
+  .month-cell .m-name { font-size: 10px; font-weight: 700; color: rgba(255,255,255,.6); text-transform: uppercase; margin-bottom: 4px; }
+  .month-cell .m-val { font-size: 12px; font-weight: 700; color: #fff; }
+  .month-cell .m-orig { font-size: 10px; color: rgba(255,255,255,.5); margin-top: 2px; }
+
+  /* Deviations */
+  .deviation-section { margin-bottom: 28px; }
+  .dev-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+  .dev-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px; box-shadow: var(--card-shadow);
+  }
+  .dev-card h4 { font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 12px; }
+  .dev-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(46,50,80,.4); }
+  .dev-row:last-child { border-bottom: none; }
+  .dev-month { font-size: 12px; color: var(--muted); }
+  .dev-amount { font-size: 12px; font-weight: 600; }
+  .dev-diff { font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: 700; }
+  .dev-diff.up { background: rgba(255,107,107,.15); color: var(--accent2); }
+  .dev-diff.down { background: rgba(81,216,138,.15); color: var(--accent3); }
+
+  /* Footer */
+  footer { text-align: center; padding: 24px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--border); }
+
+  /* Tooltip */
+  .tooltip { position: relative; display: inline-block; }
+  .tooltip .tip {
+    visibility: hidden; background: #333; color: #fff; text-align: center;
+    padding: 4px 8px; border-radius: 4px; font-size: 11px;
+    position: absolute; z-index: 1; bottom: 125%; left: 50%; transform: translateX(-50%);
+    white-space: nowrap; opacity: 0; transition: opacity .2s;
+  }
+  .tooltip:hover .tip { visibility: visible; opacity: 1; }
+
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 4px; }
+  .tag.gastos { background: rgba(91,127,255,.15); color: var(--accent); }
+  .tag.servicios { background: rgba(255,196,77,.15); color: var(--accent4); }
+  .tag.capacitacion { background: rgba(81,216,138,.15); color: var(--accent3); }
+  .tag.anulacion { background: rgba(255,107,107,.15); color: var(--accent2); }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Informe de Gastos 2026 — Comercial Crédito</h1>
+    <p>Presupuesto anual por concepto · Casa Central · Revisión final 24/02/2026</p>
+  </div>
+  <div class="header-badge">ARS + USD</div>
+</header>
+
+<main>
+
+  <!-- KPI Cards -->
+  <div class="kpi-grid" id="kpiGrid"></div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <label>Filtrar cuenta:</label>
+    <select id="filterCuenta">
+      <option value="">Todas las cuentas</option>
+    </select>
+    <label>Moneda:</label>
+    <select id="filterMoneda">
+      <option value="">Todas</option>
+      <option value="ARS">ARS</option>
+      <option value="USD">USD</option>
+    </select>
+    <label>Buscar concepto:</label>
+    <input type="text" id="searchInput" placeholder="Ej: eventos, hoteles..." />
+    <button class="btn secondary" onclick="resetFilters()">Limpiar</button>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-grid">
+    <div class="chart-card wide">
+      <h3>Consumo mensual total (ARS)</h3>
+      <div class="chart-wrapper" style="height:260px">
+        <canvas id="chartMonthly"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <h3>Distribución por concepto (ARS)</h3>
+      <div class="chart-wrapper" style="height:300px">
+        <canvas id="chartDoughnut"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <h3>Top conceptos — Total ARS</h3>
+      <div class="chart-wrapper" style="height:300px">
+        <canvas id="chartBar"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main table -->
+  <div class="section-header">
+    <div class="section-title">Detalle por concepto <span id="rowCount"></span></div>
+  </div>
+  <div class="table-card">
+    <div class="table-scroll">
+      <table id="mainTable">
+        <thead>
+          <tr>
+            <th onclick="sortTable('concepto')">Concepto</th>
+            <th onclick="sortTable('cuenta')">Cuenta</th>
+            <th onclick="sortTable('tipo')">Tipo</th>
+            <th>Moneda</th>
+            <th onclick="sortTable('total_ars')">Total ARS</th>
+            <th>% del total</th>
+            <th>Ene</th><th>Feb</th><th>Mar</th><th>Abr</th><th>May</th><th>Jun</th>
+            <th>Jul</th><th>Ago</th><th>Sep</th><th>Oct</th><th>Nov</th><th>Dic</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Monthly detail per concept -->
+  <div class="section-header">
+    <div class="section-title">Detalle mensual por concepto</div>
+  </div>
+  <div class="detail-panel">
+    <div class="concept-selector" id="conceptChips"></div>
+    <div id="conceptDetail"></div>
+  </div>
+
+  <!-- Deviations -->
+  <div class="section-header">
+    <div class="section-title">Desvíos mensuales por concepto <span>(vs. promedio mensual)</span></div>
+  </div>
+  <div class="dev-grid" id="deviationGrid"></div>
+
+</main>
+
+<footer>Informe generado automáticamente · Comercial Crédito 2026 · Datos: Planilla_Gastos_2026_Revisión_final_24.2</footer>
+
+<script>
+// ─── DATA ───────────────────────────────────────────────────────────────────
+const MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const MONTHS_FULL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+const RAW_DATA = [
+  { concepto:'MOVISTAR', cuenta:'SERVICIOS TELEFONO', tipo:'SERVICIOS TELEFONO', moneda:'ARS', total_orig:11563434.33, total_ars:11563434.33, monthly_ars:[715764.15,754057.54,797415.85,841672.42,886701.90,934140.45,980847.47,1028909.00,1078296.63,1129515.72,1181473.44,1234639.75], monthly_orig:[715764.15,754057.54,797415.85,841672.42,886701.90,934140.45,980847.47,1028909.00,1078296.63,1129515.72,1181473.44,1234639.75], descripcion:'Servicio de telefonía celular corporativa Movistar. Sube mensualmente por inflación proyectada.' },
+  { concepto:'CAPACITACION', cuenta:'CAPACITACION', tipo:'CAPACITACION', moneda:'ARS', total_orig:7502062.92, total_ars:7502062.92, monthly_ars:[625171.91,625171.91,625171.91,625171.91,625171.91,625171.91,625171.91,625171.91,625171.91,625171.91,625171.91,625171.91], monthly_orig:[625171.91,625171.91,625171.91,625171.91,625171.91,625171.91,625171.91,625171.91,625171.91,625171.91,625171.91,625171.91], descripcion:'Presupuesto de capacitación distribuido en cuotas iguales durante todo el año.' },
+  { concepto:'ALMUERZOS COMERCIALES', cuenta:'GASTOS COMERCIALES', tipo:'ALMUERZOS / VARIOS', moneda:'ARS', total_orig:9500000, total_ars:9500000, monthly_ars:[400000,250000,450000,500000,600000,600000,900000,1200000,1200000,1300000,1300000,800000], monthly_orig:[400000,250000,450000,500000,600000,600000,900000,1200000,1200000,1300000,1300000,800000], descripcion:'Almuerzos y reuniones comerciales con clientes. Pico en el segundo semestre por mayor actividad comercial.' },
+  { concepto:'COMIDAS COMERCIALES EXTERIOR', cuenta:'GASTOS COMERCIALES', tipo:'ALMUERZOS / VARIOS', moneda:'USD', total_orig:1150, total_ars:1919083.50, monthly_ars:[0,0,0,0,0,485577,0,0,667056,509100,257350.50,0], monthly_orig:[null,null,null,null,null,300,null,null,400,300,150,null], descripcion:'Comidas con clientes del exterior en viajes internacionales. Concentrado en Junio, Septiembre, Octubre y Noviembre.' },
+  { concepto:'ALQUILER VEHICULO', cuenta:'GASTOS COMERCIALES', tipo:'ALQUILER DE VEHICULOS', moneda:'ARS', total_orig:1980000, total_ars:1980000, monthly_ars:[0,120000,180000,180000,150000,180000,200000,220000,150000,250000,250000,100000], monthly_orig:[null,120000,180000,180000,150000,180000,200000,220000,150000,250000,250000,100000], descripcion:'Alquiler de vehículos para visitas comerciales. Sin gasto en enero, pico en Octubre/Noviembre.' },
+  { concepto:'ANULACIONES EMISION', cuenta:'ANULACION DE PRIMAS DE CREDITOS', tipo:'ANULACION DE PRIMAS DE CREDITOS', moneda:'ARS', total_orig:880000, total_ars:880000, monthly_ars:[0,80000,80000,80000,80000,80000,80000,80000,80000,80000,80000,80000], monthly_orig:[null,80000,80000,80000,80000,80000,80000,80000,80000,80000,80000,80000], descripcion:'Anulaciones de pólizas de crédito. Distribución mensual fija excepto enero.' },
+  { concepto:'EVENTOS', cuenta:'GASTOS COMERCIALES', tipo:'EVENTOS', moneda:'ARS', total_orig:46200000, total_ars:46200000, monthly_ars:[0,700000,2000000,0,0,2000000,0,10000000,12000000,13000000,4000000,2500000], monthly_orig:[null,700000,2000000,null,null,2000000,null,10000000,12000000,13000000,4000000,2500000], descripcion:'Eventos comerciales nacionales. Mayor concentración en Agosto ($10M), Septiembre ($12M) y Octubre ($13M). Es el concepto de mayor peso.' },
+  { concepto:'COMBUSTIBLE AUTO ALQUILADO', cuenta:'GASTOS COMERCIALES', tipo:'COMBUSTIBLE AUTO ALQUILADO', moneda:'ARS', total_orig:830000, total_ars:830000, monthly_ars:[120000,60000,60000,60000,60000,60000,80000,80000,80000,90000,80000,0], monthly_orig:[120000,60000,60000,60000,60000,60000,80000,80000,80000,90000,80000,null], descripcion:'Combustible para vehículos alquilados. Pico en enero, sin gasto en diciembre.' },
+  { concepto:'EVENTOS EXTERIOR', cuenta:'GASTOS COMERCIALES', tipo:'EVENTOS', moneda:'USD', total_orig:5000, total_ars:8221480, monthly_ars:[0,0,0,0,4318380,0,0,0,0,3903100,0,0], monthly_orig:[null,null,null,null,2700,null,null,null,null,2300,null,null], descripcion:'Eventos en el exterior. Dos instancias anuales: Mayo (USD 2.700) y Octubre (USD 2.300).' },
+  { concepto:'ESTACIONAMIENTO', cuenta:'GASTOS COMERCIALES', tipo:'ESTACIONAMIENTO', moneda:'ARS', total_orig:600000, total_ars:600000, monthly_ars:[0,40000,40000,50000,50000,50000,60000,60000,50000,70000,80000,50000], monthly_orig:[null,40000,40000,50000,50000,50000,60000,60000,50000,70000,80000,50000], descripcion:'Gastos de estacionamiento del equipo comercial. Creciente durante el año.' },
+  { concepto:'HOTELES EN EL EXTERIOR', cuenta:'GASTOS COMERCIALES', tipo:'HOTEL', moneda:'USD', total_orig:1100, total_ars:1793500, monthly_ars:[0,0,945000,0,0,0,0,0,0,848500,0,0], monthly_orig:[null,null,600,null,null,null,null,null,null,500,null,null], descripcion:'Hoteles en viajes al exterior. Marzo (USD 600) y Octubre (USD 500).' },
+  { concepto:'HOTELES INTERIOR', cuenta:'GASTOS COMERCIALES', tipo:'HOTEL', moneda:'ARS', total_orig:6270000, total_ars:6270000, monthly_ars:[0,900000,500000,700000,750000,600000,500000,450000,450000,500000,800000,120000], monthly_orig:[null,900000,500000,700000,750000,600000,500000,450000,450000,500000,800000,120000], descripcion:'Hoteles en viajes al interior del país. Mayor actividad en Febrero y Noviembre.' },
+  { concepto:'MOVILIDAD COMERCIAL', cuenta:'GASTOS COMERCIALES', tipo:'MOVILIDAD COMERCIAL', moneda:'ARS', total_orig:12550000, total_ars:12550000, monthly_ars:[100000,550000,850000,1300000,1300000,1300000,620000,1130000,1700000,1500000,1450000,750000], monthly_orig:[100000,550000,850000,1300000,1300000,1300000,620000,1130000,1700000,1500000,1450000,750000], descripcion:'Movilidad nacional del equipo comercial. Pico en Septiembre por mayor actividad. Muy bajo en Enero.' },
+  { concepto:'MOVILIDAD EXTERIOR', cuenta:'GASTOS COMERCIALES', tipo:'MOVILIDAD COMERCIAL', moneda:'USD', total_orig:5950, total_ars:9736434.50, monthly_ars:[0,0,2677500,0,0,1861378.50,0,165276,3335280,1697000,0,0], monthly_orig:[null,null,1700,null,null,1150,null,100,2000,1000,null,null], descripcion:'Traslados en viajes al exterior. Concentrado en Marzo, Junio, Septiembre y Octubre.' },
+  { concepto:'REGALOS COMERCIALES', cuenta:'GASTOS COMERCIALES', tipo:'REGALOS COMERCIALES', moneda:'ARS', total_orig:700000, total_ars:700000, monthly_ars:[0,0,400000,0,0,0,0,300000,0,0,0,0], monthly_orig:[null,null,400000,null,null,null,null,300000,null,null,null,null], descripcion:'Regalos institucionales y comerciales. Dos momentos: Marzo y Agosto.' },
+  { concepto:'TARJETAS', cuenta:'GASTOS COMERCIALES', tipo:'IMPRESOS Y PAPELERIA COMERCIAL', moneda:'ARS', total_orig:200000, total_ars:200000, monthly_ars:[0,100000,0,0,100000,0,0,0,0,0,0,0], monthly_orig:[null,100000,null,null,100000,null,null,null,null,null,null,null], descripcion:'Tarjetas corporativas e impresos comerciales. Dos reposiciones: Febrero y Mayo.' },
+  { concepto:'MERCHANDISING', cuenta:'GASTOS COMERCIALES', tipo:'MARKETING', moneda:'ARS', total_orig:5750000, total_ars:5750000, monthly_ars:[0,650000,0,800000,800000,0,1000000,0,1000000,0,1500000,0], monthly_orig:[null,650000,null,800000,800000,null,1000000,null,1000000,null,1500000,null], descripcion:'Merchandising y materiales de marketing. Pico en Noviembre. Distribución irregular por lotes de compra.' },
+  { concepto:'HORAS DC', cuenta:null, tipo:null, moneda:'ARS', total_orig:3495556.36, total_ars:3495556.36, monthly_ars:[30000,0,30000,0,30000,3315556.36,30000,0,30000,0,30000,0], monthly_orig:[30000,null,30000,null,30000,3315556.36,30000,null,30000,null,30000,null], descripcion:'Horas de DataCenter. Concentración en Junio ($3.3M) posiblemente por un proyecto especial o migración.' },
+  { concepto:'DONACIONES', cuenta:null, tipo:null, moneda:'ARS', total_orig:1200000, total_ars:1200000, monthly_ars:[0,0,0,0,0,0,0,0,0,1200000,0,0], monthly_orig:[null,null,null,null,null,null,null,null,null,1200000,null,null], descripcion:'Donaciones institucionales. Único pago en Octubre.' }
+];
+
+const GRAND_TOTAL = RAW_DATA.reduce((s, d) => s + d.total_ars, 0);
+
+// ─── UTILS ──────────────────────────────────────────────────────────────────
+function fmt(n, decimals = 0) {
+  if (n == null || n === 0) return '—';
+  return new Intl.NumberFormat('es-AR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(n);
+}
+function fmtM(n) {
+  if (!n) return '—';
+  if (Math.abs(n) >= 1e6) return '$' + (n/1e6).toFixed(1) + 'M';
+  if (Math.abs(n) >= 1e3) return '$' + (n/1e3).toFixed(0) + 'k';
+  return '$' + Math.round(n);
+}
+
+function getColor(i, alpha = 1) {
+  const colors = [
+    `rgba(91,127,255,${alpha})`,`rgba(255,107,107,${alpha})`,`rgba(81,216,138,${alpha})`,
+    `rgba(255,196,77,${alpha})`,`rgba(148,103,189,${alpha})`,`rgba(23,190,207,${alpha})`,
+    `rgba(255,127,14,${alpha})`,`rgba(214,39,40,${alpha})`,`rgba(44,160,44,${alpha})`,
+    `rgba(31,119,180,${alpha})`,`rgba(188,189,34,${alpha})`,`rgba(23,190,207,${alpha})`,
+    `rgba(174,199,232,${alpha})`,`rgba(255,187,120,${alpha})`,`rgba(152,223,138,${alpha})`,
+    `rgba(255,152,150,${alpha})`,`rgba(197,176,213,${alpha})`,`rgba(196,156,148,${alpha})`,
+    `rgba(247,182,210,${alpha})`
+  ];
+  return colors[i % colors.length];
+}
+
+function heatColor(v, min, max) {
+  if (v === 0 || v === null) return 'rgba(46,50,80,0.5)';
+  const ratio = (v - min) / (max - min + 0.001);
+  if (ratio < 0.3) return `rgba(81,216,138,${0.15 + ratio * 0.5})`;
+  if (ratio < 0.7) return `rgba(255,196,77,${0.2 + ratio * 0.4})`;
+  return `rgba(255,107,107,${0.3 + ratio * 0.5})`;
+}
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let filteredData = [...RAW_DATA];
+let sortKey = 'total_ars', sortDir = -1;
+let selectedConcept = 'EVENTOS';
+let chartMonthly, chartDoughnut, chartBar;
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+function init() {
+  buildKPIs();
+  buildFilterOptions();
+  buildCharts();
+  buildConceptChips();
+  renderAll();
+}
+
+// ─── KPIs ────────────────────────────────────────────────────────────────────
+function buildKPIs() {
+  const totalARS = RAW_DATA.reduce((s,d)=>s+d.total_ars,0);
+  const usdItems = RAW_DATA.filter(d=>d.moneda==='USD');
+  const totalUSD = usdItems.reduce((s,d)=>s+d.total_orig,0);
+  const monthTotals = MONTHS.map((_,i) => RAW_DATA.reduce((s,d)=>s+(d.monthly_ars[i]||0),0));
+  const maxMonth = Math.max(...monthTotals);
+  const maxMonthName = MONTHS_FULL[monthTotals.indexOf(maxMonth)];
+  const numConceptos = RAW_DATA.length;
+
+  document.getElementById('kpiGrid').innerHTML = `
+    <div class="kpi-card blue">
+      <div class="label">Total Presupuesto ARS</div>
+      <div class="value">$${(totalARS/1e6).toFixed(1)}M</div>
+      <div class="sub">${fmt(totalARS)} ARS</div>
+      <div class="accent-bar"></div>
+    </div>
+    <div class="kpi-card yellow">
+      <div class="label">Total en USD</div>
+      <div class="value">USD ${fmt(totalUSD)}</div>
+      <div class="sub">${usdItems.length} conceptos en moneda extranjera</div>
+      <div class="accent-bar"></div>
+    </div>
+    <div class="kpi-card red">
+      <div class="label">Mes de mayor gasto</div>
+      <div class="value">${maxMonthName}</div>
+      <div class="sub">${fmtM(maxMonth)} presupuestados</div>
+      <div class="accent-bar"></div>
+    </div>
+    <div class="kpi-card green">
+      <div class="label">Conceptos presupuestados</div>
+      <div class="value">${numConceptos}</div>
+      <div class="sub">en ${[...new Set(RAW_DATA.map(d=>d.cuenta).filter(Boolean))].length} cuentas contables</div>
+      <div class="accent-bar"></div>
+    </div>
+    <div class="kpi-card blue">
+      <div class="label">Promedio mensual total</div>
+      <div class="value">${fmtM(totalARS/12)}</div>
+      <div class="sub">por mes sobre 12 meses</div>
+      <div class="accent-bar"></div>
+    </div>
+  `;
+}
+
+// ─── FILTERS ─────────────────────────────────────────────────────────────────
+function buildFilterOptions() {
+  const cuentas = [...new Set(RAW_DATA.map(d=>d.cuenta).filter(Boolean))].sort();
+  const sel = document.getElementById('filterCuenta');
+  cuentas.forEach(c => { const o = document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o); });
+  sel.addEventListener('change', applyFilters);
+  document.getElementById('filterMoneda').addEventListener('change', applyFilters);
+  document.getElementById('searchInput').addEventListener('input', applyFilters);
+}
+
+function applyFilters() {
+  const cuenta = document.getElementById('filterCuenta').value;
+  const moneda = document.getElementById('filterMoneda').value;
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  filteredData = RAW_DATA.filter(d => {
+    if (cuenta && d.cuenta !== cuenta) return false;
+    if (moneda && d.moneda !== moneda) return false;
+    if (search && !d.concepto.toLowerCase().includes(search) && !(d.tipo||'').toLowerCase().includes(search)) return false;
+    return true;
+  });
+  renderTable();
+  updateCharts();
+}
+
+function resetFilters() {
+  document.getElementById('filterCuenta').value = '';
+  document.getElementById('filterMoneda').value = '';
+  document.getElementById('searchInput').value = '';
+  filteredData = [...RAW_DATA];
+  renderTable();
+  updateCharts();
+}
+
+// ─── CHARTS ──────────────────────────────────────────────────────────────────
+const chartDefaults = {
+  responsive: true, maintainAspectRatio: false,
+  plugins: { legend: { labels: { color: '#8892a4', font: { size: 11 } } } },
+};
+
+function buildCharts() {
+  // Monthly bar chart
+  const monthTotals = MONTHS.map((_,i) => RAW_DATA.reduce((s,d)=>s+(d.monthly_ars[i]||0),0));
+  const ctx1 = document.getElementById('chartMonthly').getContext('2d');
+  chartMonthly = new Chart(ctx1, {
+    type: 'bar',
+    data: {
+      labels: MONTHS_FULL,
+      datasets: [{
+        label: 'Total ARS',
+        data: monthTotals,
+        backgroundColor: monthTotals.map((v,i) => getColor(i, 0.7)),
+        borderColor: monthTotals.map((v,i) => getColor(i, 1)),
+        borderWidth: 1, borderRadius: 4,
+      }]
+    },
+    options: {
+      ...chartDefaults,
+      scales: {
+        x: { ticks: { color: '#8892a4', font:{size:10} }, grid: { color: 'rgba(255,255,255,0.04)' } },
+        y: { ticks: { color: '#8892a4', font:{size:10}, callback: v => fmtM(v) }, grid: { color: 'rgba(255,255,255,0.04)' } }
+      },
+      plugins: {
+        ...chartDefaults.plugins,
+        tooltip: { callbacks: { label: ctx => ' $' + fmt(ctx.parsed.y) + ' ARS' } }
+      }
+    }
+  });
+
+  // Doughnut
+  const ctx2 = document.getElementById('chartDoughnut').getContext('2d');
+  const sorted = [...RAW_DATA].sort((a,b)=>b.total_ars-a.total_ars);
+  const top8 = sorted.slice(0,8);
+  const other = sorted.slice(8).reduce((s,d)=>s+d.total_ars,0);
+  chartDoughnut = new Chart(ctx2, {
+    type: 'doughnut',
+    data: {
+      labels: [...top8.map(d=>d.concepto), 'OTROS'],
+      datasets: [{
+        data: [...top8.map(d=>d.total_ars), other],
+        backgroundColor: [...top8.map((_,i)=>getColor(i,0.8)), 'rgba(150,150,150,0.5)'],
+        borderColor: 'rgba(0,0,0,0.3)', borderWidth: 1,
+      }]
+    },
+    options: {
+      ...chartDefaults,
+      plugins: {
+        ...chartDefaults.plugins,
+        tooltip: { callbacks: { label: ctx => ' ' + ctx.label + ': ' + fmtM(ctx.parsed) + ' (' + (ctx.parsed/GRAND_TOTAL*100).toFixed(1) + '%)' } }
+      }
+    }
+  });
+
+  // Bar horizontal
+  const ctx3 = document.getElementById('chartBar').getContext('2d');
+  const top10 = [...RAW_DATA].sort((a,b)=>b.total_ars-a.total_ars).slice(0,10);
+  chartBar = new Chart(ctx3, {
+    type: 'bar',
+    data: {
+      labels: top10.map(d=>d.concepto),
+      datasets: [{
+        label: 'Total ARS',
+        data: top10.map(d=>d.total_ars),
+        backgroundColor: top10.map((_,i)=>getColor(i,0.7)),
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      ...chartDefaults,
+      indexAxis: 'y',
+      scales: {
+        x: { ticks: { color: '#8892a4', font:{size:10}, callback: v=>fmtM(v) }, grid: { color: 'rgba(255,255,255,0.04)' } },
+        y: { ticks: { color: '#e2e8f0', font:{size:10} }, grid: { display: false } }
+      },
+      plugins: {
+        ...chartDefaults.plugins,
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ' $' + fmt(ctx.parsed.x) + ' ARS' } }
+      }
+    }
+  });
+}
+
+function updateCharts() {
+  const monthTotals = MONTHS.map((_,i) => filteredData.reduce((s,d)=>s+(d.monthly_ars[i]||0),0));
+  chartMonthly.data.datasets[0].data = monthTotals;
+  chartMonthly.update('none');
+}
+
+// ─── TABLE ───────────────────────────────────────────────────────────────────
+function sortTable(key) {
+  if (sortKey === key) sortDir *= -1;
+  else { sortKey = key; sortDir = -1; }
+  renderTable();
+}
+
+function renderTable() {
+  const data = [...filteredData].sort((a,b) => {
+    const va = a[sortKey] ?? '';
+    const vb = b[sortKey] ?? '';
+    return (va < vb ? -1 : va > vb ? 1 : 0) * sortDir;
+  });
+
+  const maxTotal = Math.max(...data.map(d=>d.total_ars));
+  document.getElementById('rowCount').textContent = `(${data.length} conceptos)`;
+
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = data.map(d => {
+    const pct = (d.total_ars / GRAND_TOTAL * 100).toFixed(1);
+    const barW = Math.round(d.total_ars / maxTotal * 80);
+    const tag = d.moneda === 'USD' ? 'usd' : '';
+    const monthCells = d.monthly_ars.map(v => `<td style="color:${v?'#e2e8f0':'#3a3f5c'}">${v ? fmtM(v) : '—'}</td>`).join('');
+    return `
+      <tr onclick="selectConcept('${d.concepto}')" style="cursor:pointer">
+        <td class="td-concepto">${d.concepto}</td>
+        <td style="color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis">${d.cuenta||'—'}</td>
+        <td style="color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis">${d.tipo||'—'}</td>
+        <td><span class="td-moneda ${tag}">${d.moneda}</span></td>
+        <td style="font-weight:700">$${fmt(d.total_ars)}</td>
+        <td>
+          <div class="bar-cell">
+            <div class="mini-bar" style="width:${barW}px"></div>
+            <span style="color:var(--muted);font-size:11px">${pct}%</span>
+          </div>
+        </td>
+        ${monthCells}
+      </tr>`;
+  }).join('');
+}
+
+// ─── CONCEPT CHIPS ───────────────────────────────────────────────────────────
+function buildConceptChips() {
+  const container = document.getElementById('conceptChips');
+  container.innerHTML = RAW_DATA.map(d =>
+    `<button class="concept-chip ${d.concepto===selectedConcept?'active':''}" onclick="selectConcept('${d.concepto}')">${d.concepto}</button>`
+  ).join('');
+}
+
+function selectConcept(name) {
+  selectedConcept = name;
+  document.querySelectorAll('.concept-chip').forEach(c => c.classList.toggle('active', c.textContent === name));
+  renderConceptDetail();
+  const el = document.getElementById('conceptDetail');
+  el.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function renderConceptDetail() {
+  const d = RAW_DATA.find(r => r.concepto === selectedConcept);
+  if (!d) return;
+  const vals = d.monthly_ars.filter(v=>v>0);
+  const avg = vals.length ? vals.reduce((s,v)=>s+v,0)/vals.length : 0;
+  const min = vals.length ? Math.min(...vals) : 0;
+  const max = vals.length ? Math.max(...vals) : 0;
+
+  const monthCells = d.monthly_ars.map((v,i) => {
+    const bg = heatColor(v, 0, Math.max(...d.monthly_ars));
+    const dev = avg > 0 ? ((v - avg)/avg*100) : 0;
+    const devStr = v > 0 ? (dev > 0 ? `+${dev.toFixed(0)}%` : `${dev.toFixed(0)}%`) : '';
+    const devColor = dev > 20 ? '#ff6b6b' : dev < -20 ? '#51d88a' : '#ffc94d';
+    const origVal = d.moneda === 'USD' && d.monthly_orig[i] ? `USD ${d.monthly_orig[i]}` : '';
+    return `
+      <div class="month-cell" style="background:${bg}">
+        <div class="m-name">${MONTHS[i]}</div>
+        <div class="m-val">${v ? fmtM(v) : '—'}</div>
+        ${origVal ? `<div class="m-orig">${origVal}</div>` : ''}
+        ${devStr ? `<div style="font-size:10px;color:${devColor};margin-top:2px">${devStr}</div>` : ''}
+      </div>`;
+  }).join('');
+
+  document.getElementById('conceptDetail').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:16px;margin-bottom:20px">
+      <div>
+        <div style="font-size:18px;font-weight:800;color:#fff">${d.concepto}</div>
+        <div style="color:var(--muted);font-size:12px;margin-top:4px">${d.cuenta||''} ${d.tipo && d.tipo!==d.cuenta ? '· '+d.tipo : ''} · <span class="td-moneda ${d.moneda==='USD'?'usd':''}">${d.moneda}</span></div>
+        <div style="color:#a0aec0;font-size:13px;margin-top:10px;max-width:600px;line-height:1.5">${d.descripcion}</div>
+      </div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap">
+        <div style="text-align:center"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Total ARS</div><div style="font-size:20px;font-weight:800;color:#fff">$${fmt(d.total_ars)}</div></div>
+        ${d.moneda==='USD'?`<div style="text-align:center"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Total USD</div><div style="font-size:20px;font-weight:800;color:var(--accent4)">USD ${fmt(d.total_orig)}</div></div>`:''}
+        <div style="text-align:center"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Pico mensual</div><div style="font-size:20px;font-weight:800;color:var(--accent2)">${fmtM(max)}</div></div>
+        <div style="text-align:center"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Promedio mensual</div><div style="font-size:20px;font-weight:800;color:var(--accent4)">${fmtM(avg)}</div></div>
+        <div style="text-align:center"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">% del total</div><div style="font-size:20px;font-weight:800;color:var(--accent3)">${(d.total_ars/GRAND_TOTAL*100).toFixed(1)}%</div></div>
+      </div>
+    </div>
+    <div class="month-grid">${monthCells}</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px">
+      Color: <span style="color:var(--accent3)">verde = bajo</span> · <span style="color:var(--accent4)">amarillo = medio</span> · <span style="color:var(--accent2)">rojo = alto</span> · gris = sin gasto.
+      Porcentaje indica desvío vs. promedio de meses con gasto.
+    </div>
+  `;
+}
+
+// ─── DEVIATIONS ──────────────────────────────────────────────────────────────
+function buildDeviationCards() {
+  const container = document.getElementById('deviationGrid');
+  const toShow = [...RAW_DATA].sort((a,b)=>b.total_ars-a.total_ars).slice(0,8);
+
+  container.innerHTML = toShow.map(d => {
+    const actives = d.monthly_ars.filter(v=>v>0);
+    if (!actives.length) return '';
+    const avg = actives.reduce((s,v)=>s+v,0) / actives.length;
+
+    const rows = d.monthly_ars.map((v,i) => {
+      if (!v) return '';
+      const diff = v - avg;
+      const pct = (diff/avg*100).toFixed(0);
+      const cls = diff > 0 ? 'up' : 'down';
+      return `<div class="dev-row">
+        <span class="dev-month">${MONTHS_FULL[i]}</span>
+        <span class="dev-amount">${fmtM(v)}</span>
+        <span class="dev-diff ${cls}">${diff>0?'+':''}${pct}%</span>
+      </div>`;
+    }).join('');
+
+    return `<div class="dev-card">
+      <h4>${d.concepto} <span style="color:var(--muted);font-weight:400;font-size:12px">— prom. ${fmtM(avg)}/mes</span></h4>
+      ${rows}
+    </div>`;
+  }).join('');
+}
+
+// ─── RENDER ALL ──────────────────────────────────────────────────────────────
+function renderAll() {
+  renderTable();
+  renderConceptDetail();
+  buildDeviationCards();
+}
+
+init();
+</script>
+</body>
+</html>
