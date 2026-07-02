@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gastos 2026 — Comercial Crédito</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   :root {
     --bg: #f5f6fa;
@@ -174,6 +175,35 @@
   .section-hdr .title { font-size: 14px; font-weight: 800; color: var(--text); }
   .section-hdr .sub { font-size: 11px; color: var(--muted2); margin-left: 6px; }
   footer { text-align: center; padding: 20px; color: var(--muted2); font-size: 11px; border-top: 1px solid var(--border); margin-top: 20px; }
+
+  /* IMPORT MODAL */
+  .drop-zone {
+    border: 2px dashed var(--border); border-radius: 12px; padding: 32px 20px;
+    text-align: center; transition: all .2s; cursor: pointer; background: var(--surface2);
+    margin-bottom: 18px;
+  }
+  .drop-zone:hover, .drop-zone.drag { border-color: var(--accent); background: var(--accent-light); }
+  .drop-zone .dz-icon { font-size: 36px; margin-bottom: 8px; }
+  .drop-zone p { color: var(--muted); font-size: 13px; }
+  .drop-zone strong { color: var(--accent); }
+  .import-preview { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
+  .import-preview table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .import-preview th { background: var(--surface2); padding: 8px 10px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--muted); }
+  .import-preview td { padding: 6px 10px; border-top: 1px solid var(--border); }
+  .import-preview .match { color: var(--accent3); font-weight: 700; }
+  .import-preview .nomatch { color: var(--accent2); }
+  .import-preview .val-cell { font-weight: 600; color: var(--text); }
+  .step { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 8px; background: var(--surface2); margin-bottom: 8px; font-size: 12px; }
+  .step-num { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .col-selector { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
+  .col-selector label { font-size: 12px; font-weight: 600; color: var(--text); }
+  .alert { padding: 10px 14px; border-radius: 8px; font-size: 12px; margin-bottom: 14px; }
+  .alert.info { background: var(--accent-light); color: var(--accent); border: 1px solid #c5d0fa; }
+  .alert.warn { background: var(--accent4-light); color: var(--accent4); border: 1px solid #ffd43b; }
+  .alert.ok { background: var(--accent3-light); color: var(--accent3); border: 1px solid #b2f2bb; }
+  .tabs2 { display: flex; gap: 6px; margin-bottom: 16px; }
+  .tab2 { padding: 6px 14px; border-radius: 6px; border: 1.5px solid var(--border); font-size: 12px; font-weight: 600; cursor: pointer; background: transparent; color: var(--muted); transition: all .15s; }
+  .tab2.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 </style>
 </head>
 <body>
@@ -186,7 +216,8 @@
   </div>
   <div class="header-right">
     <span class="badge" id="statusBadge"><span class="dot"></span><span id="statusTxt">SIN REAL</span></span>
-    <button class="btn primary" onclick="openModal()">+ Cargar mes</button>
+    <button class="btn ghost" onclick="openImport()">↑ Subir archivo</button>
+    <button class="btn primary" onclick="openModal()">+ Cargar manual</button>
   </div>
 </header>
 
@@ -221,12 +252,76 @@
   </div>
 </div>
 
+<!-- MODAL IMPORTAR ARCHIVO -->
+<div class="modal-overlay" id="importOverlay">
+  <div class="modal" style="width:780px">
+    <button class="modal-close" onclick="closeImport()">✕</button>
+    <h2>Importar desde PowerBI / Excel / CSV</h2>
+    <p class="modal-sub">Exportá desde PowerBI a Excel o CSV y subí el archivo. El sistema detecta automáticamente los conceptos y valores.</p>
+
+    <div class="tabs2">
+      <button class="tab2 active" onclick="showImportTab('file')">Subir archivo</button>
+      <button class="tab2" onclick="showImportTab('howto')">¿Cómo exportar desde PowerBI?</button>
+    </div>
+
+    <div id="importTabFile">
+      <!-- PASO 1: mes -->
+      <div class="step"><span class="step-num">1</span><span>Seleccioná el <strong>mes</strong> al que corresponden los datos:</span>
+        <select class="big" id="importMonth" style="margin-left:auto">
+          <option value="0">Enero</option><option value="1">Febrero</option>
+          <option value="2">Marzo</option><option value="3">Abril</option>
+          <option value="4">Mayo</option><option value="5">Junio</option>
+          <option value="6">Julio</option><option value="7">Agosto</option>
+          <option value="8">Septiembre</option><option value="9">Octubre</option>
+          <option value="10">Noviembre</option><option value="11">Diciembre</option>
+        </select>
+      </div>
+
+      <!-- PASO 2: archivo -->
+      <div class="step"><span class="step-num">2</span><span>Subí el archivo exportado de PowerBI (<strong>.xlsx</strong> o <strong>.csv</strong>)</span></div>
+      <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()"
+           ondragover="event.preventDefault();this.classList.add('drag')"
+           ondragleave="this.classList.remove('drag')"
+           ondrop="handleDrop(event)">
+        <div class="dz-icon">📂</div>
+        <p>Arrastrá el archivo acá o <strong>hacé clic para buscar</strong></p>
+        <p style="font-size:11px;margin-top:4px">Formatos: .xlsx · .xls · .csv</p>
+      </div>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleFile(this.files[0])">
+
+      <!-- PASO 3: previsualización -->
+      <div id="importStep3" style="display:none">
+        <div class="step"><span class="step-num">3</span><span>Confirmá el mapeo de columnas y revisá los datos detectados</span></div>
+        <div class="col-selector" id="colSelector"></div>
+        <div id="importAlert"></div>
+        <div class="import-preview" id="importPreview"></div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn clear" onclick="closeImport()">Cancelar</button>
+        <button class="btn green" id="importSaveBtn" style="display:none" onclick="saveImport()">Guardar datos del mes</button>
+      </div>
+    </div>
+
+    <div id="importTabHowto" style="display:none">
+      <div class="alert info" style="margin-bottom:16px">Seguí estos pasos para exportar desde PowerBI Desktop o el servicio web:</div>
+      <div class="step"><span class="step-num">1</span><span>En PowerBI, abrí el reporte con los datos de gastos</span></div>
+      <div class="step"><span class="step-num">2</span><span>Hacé clic en el visual/tabla que muestra los conceptos y montos</span></div>
+      <div class="step"><span class="step-num">3</span><span>Clic en los <strong>tres puntos (...)</strong> del visual → <strong>"Exportar datos"</strong></span></div>
+      <div class="step"><span class="step-num">4</span><span>Elegí <strong>"Datos resumidos"</strong> → formato <strong>Excel (.xlsx)</strong> → <strong>Exportar</strong></span></div>
+      <div class="step"><span class="step-num">5</span><span>Volvé a la pestaña "Subir archivo" y subí el .xlsx descargado</span></div>
+      <div class="alert warn" style="margin-top:16px">⚠️ El archivo exportado debe tener <strong>al menos dos columnas</strong>: una con el nombre del concepto y otra con el monto. Los nombres deben coincidir (o parecerse) a los conceptos del presupuesto.</div>
+      <div class="modal-actions"><button class="btn clear" onclick="closeImport()">Cerrar</button></div>
+    </div>
+  </div>
+</div>
+
 <main>
 
 <!-- BANNER CARGA -->
 <div class="load-banner">
-  <p><strong>¿Cómo usar?</strong> Cuando recibís el PowerBI actualizado, hacé clic en <strong>"+ Cargar mes"</strong>, elegí el mes, ingresá los valores de cada concepto y guardá. Los gráficos y desvíos se actualizan automáticamente. Los datos se guardan en este navegador.</p>
-  <button class="btn ghost" onclick="openModal()">Cargar datos →</button>
+  <p><strong>¿Cómo usar?</strong> Subí el archivo exportado del PowerBI (<strong>↑ Subir archivo</strong>) o ingresá los valores manualmente (<strong>+ Cargar manual</strong>). Los datos se guardan en este navegador.</p>
+  <button class="btn ghost" onclick="openImport()">↑ Subir archivo →</button>
 </div>
 
 <!-- TABS -->
@@ -720,6 +815,206 @@ function init(){
   refreshAll();
 }
 init();
+
+// ═══════════════════════════════════════════════════════════════
+// IMPORTADOR DE ARCHIVOS (Excel / CSV desde PowerBI)
+// ═══════════════════════════════════════════════════════════════
+let importRows = [], importColConcepto = '', importColValor = '', importHeaders = [];
+
+function openImport(){
+  // sugerir mes actual (0-based, julio = 6)
+  const m = new Date().getMonth();
+  document.getElementById('importMonth').value = m <= 11 ? m : 0;
+  document.getElementById('importOverlay').classList.add('open');
+}
+function closeImport(){
+  document.getElementById('importOverlay').classList.remove('open');
+  resetImport();
+}
+function resetImport(){
+  importRows=[]; importColConcepto=''; importColValor=''; importHeaders=[];
+  document.getElementById('importStep3').style.display='none';
+  document.getElementById('importSaveBtn').style.display='none';
+  document.getElementById('fileInput').value='';
+  document.getElementById('dropZone').querySelector('p').textContent='Arrastrá el archivo acá o hacé clic para buscar';
+}
+function showImportTab(t){
+  document.getElementById('importTabFile').style.display = t==='file'?'':'none';
+  document.getElementById('importTabHowto').style.display = t==='howto'?'':'none';
+  document.querySelectorAll('.tab2').forEach((b,i)=>b.classList.toggle('active',['file','howto'][i]===t));
+}
+
+function handleDrop(e){
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if(f) handleFile(f);
+}
+
+function handleFile(file){
+  if(!file) return;
+  document.getElementById('dropZone').querySelector('p').textContent = '📄 ' + file.name + ' — procesando...';
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try {
+      let rows;
+      if(file.name.endsWith('.csv')){
+        rows = parseCSV(e.target.result);
+      } else {
+        const wb = XLSX.read(e.target.result, {type:'array'});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+      }
+      if(!rows || !rows.length){ showAlert('El archivo no tiene datos o el formato no es compatible.','warn'); return; }
+      importRows = rows;
+      importHeaders = Object.keys(rows[0]);
+      autoDetectColumns();
+      renderColSelector();
+      renderPreview();
+      document.getElementById('importStep3').style.display='';
+      document.getElementById('dropZone').querySelector('p').textContent = '✅ ' + file.name + ' cargado correctamente';
+    } catch(err){
+      showAlert('Error al leer el archivo: ' + err.message, 'warn');
+      document.getElementById('dropZone').querySelector('p').textContent='Arrastrá el archivo acá o hacé clic para buscar';
+    }
+  };
+  if(file.name.endsWith('.csv')){
+    reader.readAsText(file, 'UTF-8');
+  } else {
+    reader.readAsArrayBuffer(file);
+  }
+}
+
+function parseCSV(text){
+  const lines = text.trim().split(/\r?\n/);
+  if(!lines.length) return [];
+  // detect separator
+  const sep = lines[0].includes(';') ? ';' : ',';
+  const headers = lines[0].split(sep).map(h=>h.trim().replace(/^"|"$/g,''));
+  return lines.slice(1).map(l=>{
+    const vals = l.split(sep).map(v=>v.trim().replace(/^"|"$/g,''));
+    const obj={};
+    headers.forEach((h,i)=>{ obj[h]=vals[i]||''; });
+    return obj;
+  }).filter(r=>Object.values(r).some(v=>v!==''));
+}
+
+// Detecta automáticamente columnas de concepto y valor
+function autoDetectColumns(){
+  const conceptos = BUDGET.map(b=>b.concepto.toLowerCase());
+  // columna de concepto: la que más matches tiene con los nombres de BUDGET
+  let bestC='', bestCScore=0;
+  importHeaders.forEach(h=>{
+    const score = importRows.slice(0,50).filter(r=>{
+      const v = String(r[h]).toLowerCase().trim();
+      return conceptos.some(c=> v.includes(c.slice(0,6)) || c.includes(v.slice(0,6)));
+    }).length;
+    if(score > bestCScore){ bestCScore=score; bestC=h; }
+  });
+  // si no encontró, usar primera columna de texto
+  if(!bestC) bestC = importHeaders.find(h=>isNaN(+importRows[0]?.[h])) || importHeaders[0];
+  importColConcepto = bestC;
+
+  // columna de valor: la que tenga más números y no sea la de concepto
+  let bestV='', bestVScore=0;
+  importHeaders.forEach(h=>{
+    if(h===importColConcepto) return;
+    const score = importRows.slice(0,50).filter(r=> r[h]!=='' && !isNaN(parseNum(r[h]))).length;
+    if(score > bestVScore){ bestVScore=score; bestV=h; }
+  });
+  if(!bestV) bestV = importHeaders.find(h=>h!==importColConcepto) || importHeaders[1];
+  importColValor = bestV;
+}
+
+function parseNum(v){
+  if(v===null||v===undefined||v==='') return NaN;
+  // handle "1.234.567,89" or "1,234,567.89" or "$1.234" etc
+  const s = String(v).replace(/[$ ]/g,'');
+  // si tiene coma como decimal (formato AR/ES)
+  if(/\d+\.\d{3},\d/.test(s)) return parseFloat(s.replace(/\./g,'').replace(',','.'));
+  if(/\d+,\d{3}\./.test(s)) return parseFloat(s.replace(/,/g,''));
+  if(/,/.test(s) && !/\./.test(s)) return parseFloat(s.replace(',','.'));
+  return parseFloat(s.replace(/,/g,''));
+}
+
+function renderColSelector(){
+  const opts = importHeaders.map(h=>`<option value="${h}">${h}</option>`).join('');
+  document.getElementById('colSelector').innerHTML=`
+    <label>Columna CONCEPTO:</label>
+    <select class="big" id="selConcepto" onchange="importColConcepto=this.value;renderPreview()">
+      ${importHeaders.map(h=>`<option value="${h}" ${h===importColConcepto?'selected':''}>${h}</option>`).join('')}
+    </select>
+    <label style="margin-left:10px">Columna VALOR ($):</label>
+    <select class="big" id="selValor" onchange="importColValor=this.value;renderPreview()">
+      ${importHeaders.map(h=>`<option value="${h}" ${h===importColValor?'selected':''}>${h}</option>`).join('')}
+    </select>
+  `;
+}
+
+// Normaliza nombres para comparación fuzzy
+function normalize(s){ return String(s).toUpperCase().trim().replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/,' ').trim(); }
+function matchConcepto(rowVal){
+  const rv = normalize(rowVal);
+  // exact
+  let m = BUDGET.find(b=>normalize(b.concepto)===rv);
+  if(m) return m;
+  // starts with
+  m = BUDGET.find(b=>rv.startsWith(normalize(b.concepto).slice(0,5)) || normalize(b.concepto).startsWith(rv.slice(0,5)));
+  if(m) return m;
+  // contains
+  m = BUDGET.find(b=>rv.includes(normalize(b.concepto).slice(0,6)) || normalize(b.concepto).includes(rv.slice(0,6)));
+  return m || null;
+}
+
+function renderPreview(){
+  const matched=[], unmatched=[];
+  importRows.forEach(r=>{
+    const rv = r[importColConcepto];
+    const vv = parseNum(r[importColValor]);
+    const b = matchConcepto(rv);
+    if(b && !isNaN(vv) && vv>0) matched.push({concepto:b.concepto, rawName:rv, valor:vv});
+    else if(rv) unmatched.push({rawName:rv, valor:r[importColValor]});
+  });
+
+  const matchedSet = new Set(matched.map(m=>m.concepto));
+  const missing = BUDGET.filter(b=>!matchedSet.has(b.concepto));
+
+  let html = `<table>
+    <tr><th>Concepto detectado</th><th>Nombre en archivo</th><th>Valor</th><th>Estado</th></tr>`;
+  matched.forEach(m=>{ html+=`<tr><td class="match">${m.concepto}</td><td style="color:var(--muted)">${m.rawName}</td><td class="val-cell">$${fmt(m.valor)}</td><td>✅</td></tr>`; });
+  unmatched.slice(0,5).forEach(u=>{ html+=`<tr><td class="nomatch">—</td><td style="color:var(--muted)">${u.rawName||'(vacío)'}</td><td>${u.valor}</td><td>⚠️ No reconocido</td></tr>`; });
+  if(missing.length) missing.forEach(b=>{ html+=`<tr><td style="color:var(--muted2)">${b.concepto}</td><td>—</td><td>—</td><td style="color:var(--muted2)">Sin dato</td></tr>`; });
+  html += '</table>';
+  document.getElementById('importPreview').innerHTML=html;
+
+  // alert
+  const alertDiv = document.getElementById('importAlert');
+  if(matched.length===0){
+    alertDiv.innerHTML=`<div class="alert warn">⚠️ No se reconoció ningún concepto. Verificá que la columna "Concepto" sea la correcta y que los nombres coincidan con el presupuesto.</div>`;
+    document.getElementById('importSaveBtn').style.display='none';
+  } else {
+    alertDiv.innerHTML=`<div class="alert ok">✅ Se detectaron <strong>${matched.length}</strong> conceptos. ${missing.length>0?missing.length+' conceptos quedarán sin dato este mes.':''}</div>`;
+    document.getElementById('importSaveBtn').style.display='';
+    // cache para guardar
+    window._importMapped = matched;
+  }
+}
+
+function showAlert(msg, type){
+  document.getElementById('importAlert').innerHTML=`<div class="alert ${type}">${msg}</div>`;
+}
+
+function saveImport(){
+  const monthIdx = +document.getElementById('importMonth').value;
+  const mapped = window._importMapped || [];
+  mapped.forEach(({concepto, valor})=>{
+    if(!REAL[concepto]) REAL[concepto]=Array(12).fill(null);
+    REAL[concepto][monthIdx] = valor;
+  });
+  saveReal(REAL);
+  closeImport();
+  refreshAll();
+}
 </script>
 </body>
 </html>
