@@ -285,16 +285,16 @@
            ondrop="handleDrop(event)">
         <div class="dz-icon">📂</div>
         <p>Arrastrá el archivo acá o <strong>hacé clic para buscar</strong></p>
-        <p style="font-size:11px;margin-top:4px">Formatos: .xlsx · .xls · .csv</p>
+        <p style="font-size:11px;margin-top:4px">Formatos: .xlsx · .xls · .csv &nbsp;·&nbsp; <em>El .pbix no es legible directamente — exportá a Excel primero</em></p>
       </div>
-      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleFile(this.files[0])">
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.pbix" style="display:none" onchange="handleFile(this.files[0])">
 
       <!-- PASO 3: previsualización -->
       <div id="importStep3" style="display:none">
-        <div class="step"><span class="step-num">3</span><span>Confirmá el mapeo de columnas y revisá los datos detectados</span></div>
+        <div class="step"><span class="step-num">3</span><span>Revisá las columnas detectadas y confirmá la importación</span></div>
         <div class="col-selector" id="colSelector"></div>
         <div id="importAlert"></div>
-        <div class="import-preview" id="importPreview"></div>
+        <div class="import-preview" id="importPreview" style="max-height:320px;overflow-y:auto"></div>
       </div>
 
       <div class="modal-actions">
@@ -304,13 +304,14 @@
     </div>
 
     <div id="importTabHowto" style="display:none">
-      <div class="alert info" style="margin-bottom:16px">Seguí estos pasos para exportar desde PowerBI Desktop o el servicio web:</div>
-      <div class="step"><span class="step-num">1</span><span>En PowerBI, abrí el reporte con los datos de gastos</span></div>
-      <div class="step"><span class="step-num">2</span><span>Hacé clic en el visual/tabla que muestra los conceptos y montos</span></div>
-      <div class="step"><span class="step-num">3</span><span>Clic en los <strong>tres puntos (...)</strong> del visual → <strong>"Exportar datos"</strong></span></div>
-      <div class="step"><span class="step-num">4</span><span>Elegí <strong>"Datos resumidos"</strong> → formato <strong>Excel (.xlsx)</strong> → <strong>Exportar</strong></span></div>
-      <div class="step"><span class="step-num">5</span><span>Volvé a la pestaña "Subir archivo" y subí el .xlsx descargado</span></div>
-      <div class="alert warn" style="margin-top:16px">⚠️ El archivo exportado debe tener <strong>al menos dos columnas</strong>: una con el nombre del concepto y otra con el monto. Los nombres deben coincidir (o parecerse) a los conceptos del presupuesto.</div>
+      <div class="alert info" style="margin-bottom:16px">Seguí estos pasos para exportar desde PowerBI Desktop. El HTML reconocerá automáticamente las columnas de tu reporte.</div>
+      <div class="step"><span class="step-num">1</span><span>Abrí el archivo <strong>2026 - 5.2026 - Comercial Crédito.pbix</strong> en PowerBI Desktop</span></div>
+      <div class="step"><span class="step-num">2</span><span>Andá a la página <strong>"DETALLE COMPROBANTES"</strong> (segunda pestaña del reporte)</span></div>
+      <div class="step"><span class="step-num">3</span><span>Hacé clic en la tabla de detalle → aparecen los <strong>tres puntos ···</strong> arriba a la derecha del visual</span></div>
+      <div class="step"><span class="step-num">4</span><span>Clic en <strong>··· → Exportar datos</strong> → elegí <strong>"Datos subyacentes"</strong> → <strong>Exportar</strong></span></div>
+      <div class="step"><span class="step-num">5</span><span>Se descarga un <strong>.xlsx</strong> con columnas: MES · TIPO DE CUENTA · IMPORTE. Subí ese archivo acá.</span></div>
+      <div class="alert ok" style="margin-top:12px">✅ Si el archivo tiene la columna <strong>MES</strong>, el HTML cargará <strong>todos los meses de una vez</strong> automáticamente — no hace falta seleccionar mes.</div>
+      <div class="alert warn" style="margin-top:8px">💡 También podés exportar cualquier tabla/visual del reporte. El sistema detecta automáticamente TIPO DE CUENTA, MES e IMPORTE sin importar el orden de las columnas.</div>
       <div class="modal-actions"><button class="btn clear" onclick="closeImport()">Cerrar</button></div>
     </div>
   </div>
@@ -817,14 +818,26 @@ function init(){
 init();
 
 // ═══════════════════════════════════════════════════════════════
-// IMPORTADOR DE ARCHIVOS (Excel / CSV desde PowerBI)
+// IMPORTADOR — detecta automáticamente columnas de tu PowerBI
+// Columnas esperadas: TIPO DE CUENTA · MES · IMPORTE · MONEDA
 // ═══════════════════════════════════════════════════════════════
-let importRows = [], importColConcepto = '', importColValor = '', importHeaders = [];
+
+const MES_MAP = {
+  'ENERO':0,'FEBRERO':1,'MARZO':2,'ABRIL':3,'MAYO':4,'JUNIO':5,
+  'JULIO':6,'AGOSTO':7,'SEPTIEMBRE':8,'OCTUBRE':9,'NOVIEMBRE':10,'DICIEMBRE':11,
+  'ENE':0,'FEB':1,'MAR':2,'ABR':3,'MAY':4,'JUN':5,
+  'JUL':6,'AGO':7,'SEP':8,'OCT':9,'NOV':10,'DIC':11,
+  'JANUARY':0,'FEBRUARY':1,'MARCH':2,'APRIL':3,'JUNE':5,'JULY':6,'AUGUST':7,
+  'SEPTEMBER':8,'OCTOBER':9,'NOVEMBER':10,'DECEMBER':11
+};
+
+let importRows=[], importHeaders=[];
+let importColConcepto='', importColValor='', importColMes='', importColMoneda='';
+let importMultiMonth=false;
 
 function openImport(){
-  // sugerir mes actual (0-based, julio = 6)
-  const m = new Date().getMonth();
-  document.getElementById('importMonth').value = m <= 11 ? m : 0;
+  const m=new Date().getMonth();
+  document.getElementById('importMonth').value=m<=11?m:0;
   document.getElementById('importOverlay').classList.add('open');
 }
 function closeImport(){
@@ -832,185 +845,328 @@ function closeImport(){
   resetImport();
 }
 function resetImport(){
-  importRows=[]; importColConcepto=''; importColValor=''; importHeaders=[];
+  importRows=[]; importHeaders=[];
+  importColConcepto=''; importColValor=''; importColMes=''; importColMoneda='';
+  importMultiMonth=false;
   document.getElementById('importStep3').style.display='none';
   document.getElementById('importSaveBtn').style.display='none';
   document.getElementById('fileInput').value='';
   document.getElementById('dropZone').querySelector('p').textContent='Arrastrá el archivo acá o hacé clic para buscar';
+  document.getElementById('importAlert').innerHTML='';
+  document.getElementById('importPreview').innerHTML='';
 }
 function showImportTab(t){
-  document.getElementById('importTabFile').style.display = t==='file'?'':'none';
-  document.getElementById('importTabHowto').style.display = t==='howto'?'':'none';
+  document.getElementById('importTabFile').style.display=t==='file'?'':'none';
+  document.getElementById('importTabHowto').style.display=t==='howto'?'':'none';
   document.querySelectorAll('.tab2').forEach((b,i)=>b.classList.toggle('active',['file','howto'][i]===t));
 }
 
 function handleDrop(e){
   e.preventDefault();
   document.getElementById('dropZone').classList.remove('drag');
-  const f = e.dataTransfer.files[0];
+  const f=e.dataTransfer.files[0];
   if(f) handleFile(f);
 }
 
 function handleFile(file){
   if(!file) return;
-  document.getElementById('dropZone').querySelector('p').textContent = '📄 ' + file.name + ' — procesando...';
-  const reader = new FileReader();
-  reader.onload = function(e){
-    try {
+  const ext=file.name.split('.').pop().toLowerCase();
+
+  if(ext==='pbix'){
+    document.getElementById('importAlert').innerHTML=`<div class="alert warn">
+      <strong>Archivo .pbix detectado</strong> — El modelo de datos del .pbix usa compresión propietaria de Microsoft y no puede leerse en el navegador.<br><br>
+      <strong>Solución rápida:</strong> En PowerBI Desktop, andá a la página <em>DETALLE COMPROBANTES</em> → hacé clic en la tabla → <strong>··· → Exportar datos → Datos subyacentes → Exportar</strong>.<br>
+      Se descarga un .xlsx — subí ese archivo acá. El HTML detectará MES, TIPO DE CUENTA e IMPORTE automáticamente.
+    </div>`;
+    document.getElementById('importStep3').style.display='';
+    return;
+  }
+
+  document.getElementById('dropZone').querySelector('p').textContent='📄 '+file.name+' — procesando...';
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    try{
       let rows;
-      if(file.name.endsWith('.csv')){
-        rows = parseCSV(e.target.result);
+      if(ext==='csv'){
+        rows=parseCSV(ev.target.result);
       } else {
-        const wb = XLSX.read(e.target.result, {type:'array'});
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+        const wb=XLSX.read(ev.target.result,{type:'array'});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        rows=XLSX.utils.sheet_to_json(ws,{defval:''});
       }
-      if(!rows || !rows.length){ showAlert('El archivo no tiene datos o el formato no es compatible.','warn'); return; }
-      importRows = rows;
-      importHeaders = Object.keys(rows[0]);
+      if(!rows||!rows.length){ showAlert('El archivo no tiene datos o el formato no es compatible.','warn'); return; }
+      importRows=rows;
+      importHeaders=Object.keys(rows[0]);
       autoDetectColumns();
       renderColSelector();
       renderPreview();
       document.getElementById('importStep3').style.display='';
-      document.getElementById('dropZone').querySelector('p').textContent = '✅ ' + file.name + ' cargado correctamente';
-    } catch(err){
-      showAlert('Error al leer el archivo: ' + err.message, 'warn');
+      document.getElementById('dropZone').querySelector('p').textContent='✅ '+file.name+' — '+rows.length+' filas';
+    }catch(err){
+      showAlert('Error al leer el archivo: '+err.message,'warn');
       document.getElementById('dropZone').querySelector('p').textContent='Arrastrá el archivo acá o hacé clic para buscar';
     }
   };
-  if(file.name.endsWith('.csv')){
-    reader.readAsText(file, 'UTF-8');
-  } else {
-    reader.readAsArrayBuffer(file);
-  }
+  if(ext==='csv') reader.readAsText(file,'UTF-8');
+  else reader.readAsArrayBuffer(file);
 }
 
 function parseCSV(text){
-  const lines = text.trim().split(/\r?\n/);
+  const lines=text.trim().split(/\r?\n/);
   if(!lines.length) return [];
-  // detect separator
-  const sep = lines[0].includes(';') ? ';' : ',';
-  const headers = lines[0].split(sep).map(h=>h.trim().replace(/^"|"$/g,''));
+  const sep=lines[0].includes(';')?';':',';
+  const headers=lines[0].split(sep).map(h=>h.trim().replace(/^"|"$/g,''));
   return lines.slice(1).map(l=>{
-    const vals = l.split(sep).map(v=>v.trim().replace(/^"|"$/g,''));
+    const vals=l.split(sep).map(v=>v.trim().replace(/^"|"$/g,''));
     const obj={};
-    headers.forEach((h,i)=>{ obj[h]=vals[i]||''; });
+    headers.forEach((h,i)=>{obj[h]=vals[i]||'';});
     return obj;
   }).filter(r=>Object.values(r).some(v=>v!==''));
 }
 
-// Detecta automáticamente columnas de concepto y valor
-function autoDetectColumns(){
-  const conceptos = BUDGET.map(b=>b.concepto.toLowerCase());
-  // columna de concepto: la que más matches tiene con los nombres de BUDGET
-  let bestC='', bestCScore=0;
-  importHeaders.forEach(h=>{
-    const score = importRows.slice(0,50).filter(r=>{
-      const v = String(r[h]).toLowerCase().trim();
-      return conceptos.some(c=> v.includes(c.slice(0,6)) || c.includes(v.slice(0,6)));
-    }).length;
-    if(score > bestCScore){ bestCScore=score; bestC=h; }
-  });
-  // si no encontró, usar primera columna de texto
-  if(!bestC) bestC = importHeaders.find(h=>isNaN(+importRows[0]?.[h])) || importHeaders[0];
-  importColConcepto = bestC;
+function normalize(s){ return String(s).toUpperCase().trim().replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/,' ').trim(); }
 
-  // columna de valor: la que tenga más números y no sea la de concepto
-  let bestV='', bestVScore=0;
-  importHeaders.forEach(h=>{
-    if(h===importColConcepto) return;
-    const score = importRows.slice(0,50).filter(r=> r[h]!=='' && !isNaN(parseNum(r[h]))).length;
-    if(score > bestVScore){ bestVScore=score; bestV=h; }
-  });
-  if(!bestV) bestV = importHeaders.find(h=>h!==importColConcepto) || importHeaders[1];
-  importColValor = bestV;
+function autoDetectColumns(){
+  const hNorm=importHeaders.map(h=>normalize(h));
+
+  // MES — columna de mes
+  const mesExact=['MES','MONTH','PERIODO','MONTH NAME','NOMBRE MES','VARIACION MES','MES VARIACION'];
+  importColMes=importHeaders.find((_,i)=>mesExact.includes(hNorm[i]))||'';
+  if(!importColMes){
+    importColMes=importHeaders.find(h=>{
+      const sample=importRows.slice(0,15).map(r=>normalize(String(r[h])));
+      return sample.filter(v=>v in MES_MAP||Object.keys(MES_MAP).some(k=>v.startsWith(k))).length>=3;
+    })||'';
+  }
+  importMultiMonth=!!importColMes;
+
+  // MONEDA
+  const monExact=['MONEDA','CURRENCY','MON'];
+  importColMoneda=importHeaders.find((_,i)=>monExact.includes(hNorm[i]))||
+    importHeaders.find(h=>{
+      const s=importRows.slice(0,10).map(r=>normalize(String(r[h])));
+      return s.filter(v=>v==='ARS'||v==='USD').length>=2;
+    })||'';
+
+  // CONCEPTO — priorizar TIPO DE CUENTA, TIPO CUENTA, CONCEPTO
+  const concExact=['TIPO DE CUENTA','TIPO CUENTA','TIPODECUENTA','CONCEPTO','TIPO','CATEGORY','CUENTA'];
+  importColConcepto=importHeaders.find((_,i)=>concExact.includes(hNorm[i]))||'';
+  if(!importColConcepto){
+    const allNames=[...BUDGET.map(b=>b.concepto.toLowerCase()),...BUDGET.map(b=>b.tipo.toLowerCase())];
+    let bestC='',bestCS=0;
+    importHeaders.forEach(h=>{
+      const sc=importRows.slice(0,50).filter(r=>{
+        const v=String(r[h]).toLowerCase().trim();
+        return allNames.some(n=>v.includes(n.slice(0,5))||n.includes(v.slice(0,5)));
+      }).length;
+      if(sc>bestCS){bestCS=sc;bestC=h;}
+    });
+    importColConcepto=bestC||importHeaders.find(h=>isNaN(+importRows[0]?.[h]))||importHeaders[0];
+  }
+
+  // IMPORTE — valor numérico
+  const valExact=['IMPORTE','AMOUNT','MONTO','VALOR','TOTAL','IMPORTE ARS'];
+  importColValor=importHeaders.find((_,i)=>valExact.includes(hNorm[i]))||'';
+  if(!importColValor){
+    const skip=new Set([importColConcepto,importColMes,importColMoneda]);
+    let bestV='',bestVS=0;
+    importHeaders.forEach(h=>{
+      if(skip.has(h)) return;
+      const sc=importRows.slice(0,50).filter(r=>r[h]!==''&&!isNaN(parseNum(r[h]))).length;
+      if(sc>bestVS){bestVS=sc;bestV=h;}
+    });
+    importColValor=bestV||importHeaders.find(h=>h!==importColConcepto)||importHeaders[1];
+  }
 }
 
 function parseNum(v){
   if(v===null||v===undefined||v==='') return NaN;
-  // handle "1.234.567,89" or "1,234,567.89" or "$1.234" etc
-  const s = String(v).replace(/[$ ]/g,'');
-  // si tiene coma como decimal (formato AR/ES)
+  const s=String(v).replace(/[$ ]/g,'');
   if(/\d+\.\d{3},\d/.test(s)) return parseFloat(s.replace(/\./g,'').replace(',','.'));
   if(/\d+,\d{3}\./.test(s)) return parseFloat(s.replace(/,/g,''));
-  if(/,/.test(s) && !/\./.test(s)) return parseFloat(s.replace(',','.'));
+  if(/,/.test(s)&&!/\./.test(s)) return parseFloat(s.replace(',','.'));
   return parseFloat(s.replace(/,/g,''));
 }
 
-function renderColSelector(){
-  const opts = importHeaders.map(h=>`<option value="${h}">${h}</option>`).join('');
-  document.getElementById('colSelector').innerHTML=`
-    <label>Columna CONCEPTO:</label>
-    <select class="big" id="selConcepto" onchange="importColConcepto=this.value;renderPreview()">
-      ${importHeaders.map(h=>`<option value="${h}" ${h===importColConcepto?'selected':''}>${h}</option>`).join('')}
-    </select>
-    <label style="margin-left:10px">Columna VALOR ($):</label>
-    <select class="big" id="selValor" onchange="importColValor=this.value;renderPreview()">
-      ${importHeaders.map(h=>`<option value="${h}" ${h===importColValor?'selected':''}>${h}</option>`).join('')}
-    </select>
-  `;
+function parseMes(v){
+  if(!v) return null;
+  const s=normalize(String(v));
+  if(s in MES_MAP) return MES_MAP[s];
+  const key=Object.keys(MES_MAP).find(k=>s.startsWith(k));
+  if(key) return MES_MAP[key];
+  const n=parseInt(s);
+  if(!isNaN(n)&&n>=1&&n<=12) return n-1;
+  const d=new Date(v);
+  if(!isNaN(d.getTime())) return d.getMonth();
+  return null;
 }
 
-// Normaliza nombres para comparación fuzzy
-function normalize(s){ return String(s).toUpperCase().trim().replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/,' ').trim(); }
-function matchConcepto(rowVal){
-  const rv = normalize(rowVal);
-  // exact
-  let m = BUDGET.find(b=>normalize(b.concepto)===rv);
+// Mapea TIPO DE CUENTA del PowerBI al concepto del presupuesto
+// Usa MONEDA para desambiguar cuando un tipo aplica a interior/exterior
+function matchConceptoFull(rowConcepto, rowMoneda){
+  if(!rowConcepto) return null;
+  const rv=normalize(rowConcepto);
+  const mon=rowMoneda?normalize(String(rowMoneda)).trim():null;
+
+  // exact por concepto
+  let m=BUDGET.find(b=>normalize(b.concepto)===rv);
   if(m) return m;
-  // starts with
-  m = BUDGET.find(b=>rv.startsWith(normalize(b.concepto).slice(0,5)) || normalize(b.concepto).startsWith(rv.slice(0,5)));
+
+  // exact por tipo (con desambiguación por moneda)
+  const tipoMatches=BUDGET.filter(b=>normalize(b.tipo)===rv);
+  if(tipoMatches.length===1) return tipoMatches[0];
+  if(tipoMatches.length>1){
+    if(mon){ const bm=tipoMatches.find(b=>b.moneda===mon); if(bm) return bm; }
+    return tipoMatches[0];
+  }
+
+  // fuzzy por concepto
+  m=BUDGET.find(b=>rv.startsWith(normalize(b.concepto).slice(0,5))||normalize(b.concepto).startsWith(rv.slice(0,5)));
   if(m) return m;
-  // contains
-  m = BUDGET.find(b=>rv.includes(normalize(b.concepto).slice(0,6)) || normalize(b.concepto).includes(rv.slice(0,6)));
-  return m || null;
+
+  // fuzzy por tipo
+  m=BUDGET.find(b=>{
+    const bt=normalize(b.tipo);
+    return rv.includes(bt.slice(0,6))||bt.includes(rv.slice(0,6));
+  });
+  return m||null;
+}
+
+function renderColSelector(){
+  const mesOpts=`<option value="">— ninguna —</option>`+importHeaders.map(h=>`<option value="${h}" ${h===importColMes?'selected':''}>${h}</option>`).join('');
+  document.getElementById('colSelector').innerHTML=`
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px">
+      <div>
+        <div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:3px">TIPO/CONCEPTO</div>
+        <select class="big" onchange="importColConcepto=this.value;renderPreview()">
+          ${importHeaders.map(h=>`<option value="${h}" ${h===importColConcepto?'selected':''}>${h}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:3px">IMPORTE/VALOR</div>
+        <select class="big" onchange="importColValor=this.value;renderPreview()">
+          ${importHeaders.map(h=>`<option value="${h}" ${h===importColValor?'selected':''}>${h}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:3px">MES <span style="font-weight:400">(opcional)</span></div>
+        <select class="big" onchange="importColMes=this.value;importMultiMonth=!!this.value;renderPreview()">${mesOpts}</select>
+      </div>
+    </div>
+    ${importMultiMonth?`<div class="alert info" style="margin-bottom:10px">📅 <strong>Modo multi-mes:</strong> se importarán todos los meses del archivo de una sola vez.</div>`:''}
+  `;
+  // ocultar selector de mes único si hay columna MES
+  const step1=document.querySelector('#importTabFile .step:first-child');
+  if(step1) step1.style.display=importMultiMonth?'none':'';
 }
 
 function renderPreview(){
-  const matched=[], unmatched=[];
+  if(importMultiMonth) renderPreviewMulti();
+  else renderPreviewSingle();
+}
+
+function renderPreviewSingle(){
+  const matched=[],unmatched=[];
   importRows.forEach(r=>{
-    const rv = r[importColConcepto];
-    const vv = parseNum(r[importColValor]);
-    const b = matchConcepto(rv);
-    if(b && !isNaN(vv) && vv>0) matched.push({concepto:b.concepto, rawName:rv, valor:vv});
-    else if(rv) unmatched.push({rawName:rv, valor:r[importColValor]});
+    const rv=r[importColConcepto];
+    const vv=parseNum(r[importColValor]);
+    const mon=importColMoneda?r[importColMoneda]:null;
+    const b=matchConceptoFull(rv,mon);
+    if(b&&!isNaN(vv)&&vv>0) matched.push({concepto:b.concepto,rawName:rv,valor:vv});
+    else if(rv&&rv!=='') unmatched.push({rawName:rv,valor:r[importColValor]});
   });
+  const matchedSet=new Set(matched.map(m=>m.concepto));
+  const missing=BUDGET.filter(b=>!matchedSet.has(b.concepto));
 
-  const matchedSet = new Set(matched.map(m=>m.concepto));
-  const missing = BUDGET.filter(b=>!matchedSet.has(b.concepto));
-
-  let html = `<table>
-    <tr><th>Concepto detectado</th><th>Nombre en archivo</th><th>Valor</th><th>Estado</th></tr>`;
-  matched.forEach(m=>{ html+=`<tr><td class="match">${m.concepto}</td><td style="color:var(--muted)">${m.rawName}</td><td class="val-cell">$${fmt(m.valor)}</td><td>✅</td></tr>`; });
-  unmatched.slice(0,5).forEach(u=>{ html+=`<tr><td class="nomatch">—</td><td style="color:var(--muted)">${u.rawName||'(vacío)'}</td><td>${u.valor}</td><td>⚠️ No reconocido</td></tr>`; });
-  if(missing.length) missing.forEach(b=>{ html+=`<tr><td style="color:var(--muted2)">${b.concepto}</td><td>—</td><td>—</td><td style="color:var(--muted2)">Sin dato</td></tr>`; });
-  html += '</table>';
+  let html=`<table><tr><th>Concepto presupuesto</th><th>Nombre en archivo</th><th>Valor</th><th></th></tr>`;
+  matched.forEach(m=>{html+=`<tr><td class="match">${m.concepto}</td><td style="color:var(--muted)">${m.rawName}</td><td class="val-cell">$${fmt(m.valor)}</td><td>✅</td></tr>`;});
+  unmatched.slice(0,5).forEach(u=>{html+=`<tr><td class="nomatch">—</td><td style="color:var(--muted)">${u.rawName||'(vacío)'}</td><td>${u.valor}</td><td>⚠️</td></tr>`;});
+  missing.slice(0,6).forEach(b=>{html+=`<tr><td style="color:var(--muted2)">${b.concepto}</td><td>—</td><td>—</td><td style="color:var(--muted2)">sin dato</td></tr>`;});
+  html+='</table>';
   document.getElementById('importPreview').innerHTML=html;
 
-  // alert
-  const alertDiv = document.getElementById('importAlert');
+  const alertDiv=document.getElementById('importAlert');
   if(matched.length===0){
-    alertDiv.innerHTML=`<div class="alert warn">⚠️ No se reconoció ningún concepto. Verificá que la columna "Concepto" sea la correcta y que los nombres coincidan con el presupuesto.</div>`;
+    alertDiv.innerHTML=`<div class="alert warn">⚠️ No se reconoció ningún concepto. Verificá la columna TIPO/CONCEPTO y que los valores coincidan con el presupuesto.</div>`;
     document.getElementById('importSaveBtn').style.display='none';
   } else {
-    alertDiv.innerHTML=`<div class="alert ok">✅ Se detectaron <strong>${matched.length}</strong> conceptos. ${missing.length>0?missing.length+' conceptos quedarán sin dato este mes.':''}</div>`;
+    alertDiv.innerHTML=`<div class="alert ok">✅ <strong>${matched.length}</strong> conceptos detectados.${missing.length>0?' '+missing.length+' conceptos quedarán sin dato.':''}</div>`;
     document.getElementById('importSaveBtn').style.display='';
-    // cache para guardar
-    window._importMapped = matched;
+    document.getElementById('importSaveBtn').textContent='✓ Guardar mes '+MF[+document.getElementById('importMonth').value];
+    window._importMapped=matched;
+    window._importMode='single';
   }
 }
 
-function showAlert(msg, type){
+function renderPreviewMulti(){
+  const byMes={};
+  const unmatchedTypes=new Set();
+  let totalRows=0, matchedRows=0;
+
+  importRows.forEach(r=>{
+    const rv=r[importColConcepto];
+    const vv=parseNum(r[importColValor]);
+    const mesRaw=r[importColMes];
+    const mon=importColMoneda?r[importColMoneda]:null;
+    if(!rv||isNaN(vv)||vv===0) return;
+    totalRows++;
+    const mesIdx=parseMes(mesRaw);
+    const b=matchConceptoFull(rv,mon);
+    if(b&&mesIdx!==null){
+      if(!byMes[mesIdx]) byMes[mesIdx]={};
+      byMes[mesIdx][b.concepto]=(byMes[mesIdx][b.concepto]||0)+vv;
+      matchedRows++;
+    } else {
+      if(rv) unmatchedTypes.add(rv);
+    }
+  });
+
+  const meses=Object.keys(byMes).map(Number).sort((a,b)=>a-b);
+
+  let html=`<table><tr><th>Concepto</th>${meses.map(m=>`<th>${MN[m]}</th>`).join('')}<th>Total</th></tr>`;
+  BUDGET.forEach(b=>{
+    const hasDato=meses.some(m=>byMes[m]?.[b.concepto]);
+    if(!hasDato) return;
+    const vals=meses.map(m=>byMes[m]?.[b.concepto]||0);
+    const total=vals.reduce((s,v)=>s+v,0);
+    html+=`<tr><td class="match">${b.concepto}</td>${vals.map(v=>`<td class="val-cell">${v>0?'$'+fmt(v):'—'}</td>`).join('')}<td style="font-weight:700">$${fmt(total)}</td></tr>`;
+  });
+  html+='</table>';
+  document.getElementById('importPreview').innerHTML=html;
+
+  const alertDiv=document.getElementById('importAlert');
+  if(meses.length===0){
+    alertDiv.innerHTML=`<div class="alert warn">⚠️ No se pudo detectar el mes. Verificá la columna MES.</div>`;
+    document.getElementById('importSaveBtn').style.display='none';
+  } else {
+    const mesesStr=meses.map(m=>MF[m]).join(', ');
+    alertDiv.innerHTML=`<div class="alert ok">✅ <strong>${meses.length} ${meses.length===1?'mes':'meses'} detectados:</strong> ${mesesStr}.${unmatchedTypes.size>0?' <span style="color:var(--accent4)">'+unmatchedTypes.size+' tipos sin coincidencia en presupuesto.</span>':''}</div>`;
+    document.getElementById('importSaveBtn').style.display='';
+    document.getElementById('importSaveBtn').textContent='✓ Guardar todos los meses ('+meses.length+')';
+    window._importByMes=byMes;
+    window._importMode='multi';
+  }
+}
+
+function showAlert(msg,type){
   document.getElementById('importAlert').innerHTML=`<div class="alert ${type}">${msg}</div>`;
 }
 
 function saveImport(){
-  const monthIdx = +document.getElementById('importMonth').value;
-  const mapped = window._importMapped || [];
-  mapped.forEach(({concepto, valor})=>{
-    if(!REAL[concepto]) REAL[concepto]=Array(12).fill(null);
-    REAL[concepto][monthIdx] = valor;
-  });
+  if(window._importMode==='multi'){
+    Object.entries(window._importByMes||{}).forEach(([mesIdx,conceptos])=>{
+      Object.entries(conceptos).forEach(([concepto,valor])=>{
+        if(!REAL[concepto]) REAL[concepto]=Array(12).fill(null);
+        REAL[concepto][+mesIdx]=valor;
+      });
+    });
+  } else {
+    const monthIdx=+document.getElementById('importMonth').value;
+    (window._importMapped||[]).forEach(({concepto,valor})=>{
+      if(!REAL[concepto]) REAL[concepto]=Array(12).fill(null);
+      REAL[concepto][monthIdx]=valor;
+    });
+  }
   saveReal(REAL);
   closeImport();
   refreshAll();
