@@ -694,7 +694,7 @@ function clearMonth(){
 // ═══════════════════════════════════════════════════════════
 const MES_MAP={'ENERO':0,'FEBRERO':1,'MARZO':2,'ABRIL':3,'MAYO':4,'JUNIO':5,'JULIO':6,'AGOSTO':7,'SEPTIEMBRE':8,'OCTUBRE':9,'NOVIEMBRE':10,'DICIEMBRE':11,'ENE':0,'FEB':1,'MAR':2,'ABR':3,'MAY':4,'JUN':5,'JUL':6,'AGO':7,'SEP':8,'OCT':9,'NOV':10,'DIC':11,'JANUARY':0,'FEBRUARY':1,'MARCH':2,'APRIL':3,'JUNE':5,'JULY':6,'AUGUST':7,'SEPTEMBER':8,'OCTOBER':9,'NOVEMBER':10,'DECEMBER':11};
 
-let impRows=[],impHeaders=[],impColC='',impColV='',impColM='',impColMon='',impMulti=false;
+let impRows=[],impHeaders=[],impColC='',impColV='',impColM='',impColMon='',impMulti=false,impSummary=false,impSummaryMonth=5;
 
 function openImport(){
   const m=new Date().getMonth();
@@ -703,7 +703,7 @@ function openImport(){
 }
 function closeImport(){ document.getElementById('importOverlay').classList.remove('open'); resetImport(); }
 function resetImport(){
-  impRows=[];impHeaders=[];impColC='';impColV='';impColM='';impColMon='';impMulti=false;
+  impRows=[];impHeaders=[];impColC='';impColV='';impColM='';impColMon='';impMulti=false;impSummary=false;impSummaryMonth=5;
   document.getElementById('impStep3').style.display='none';
   document.getElementById('impSaveBtn').style.display='none';
   document.getElementById('fileInput').value='';
@@ -758,6 +758,19 @@ function nrm(s){ return String(s).toUpperCase().trim().replace(/[^A-Z0-9 ]/g,' '
 
 function autoDetectCols(){
   const hn=impHeaders.map(h=>nrm(h));
+  // Detectar formato RESUMEN POR CUENTA (sin MES, con columna CUENTA)
+  const hasCuenta=hn.some(h=>h==='CUENTA');
+  const hasTipoCuenta=hn.some(h=>h==='TIPO DE CUENTA');
+  const hasMesCol=hn.some(h=>['MES','MONTH','PERIODO'].includes(h));
+  if(hasCuenta&&!hasTipoCuenta&&!hasMesCol){
+    impSummary=true; impMulti=false; impColM='';
+    impColC=impHeaders.find((_,i)=>hn[i]==='CUENTA')||'';
+    const valExactS=['REAL IMPORTE','REAL','IMPORTE REAL'];
+    impColV=impHeaders.find((_,i)=>valExactS.includes(hn[i]))||'';
+    if(!impColV){ const skip=new Set([impColC]); let bV='',bVS=0; impHeaders.forEach(h=>{ if(skip.has(h))return; const sc=impRows.slice(0,20).filter(r=>r[h]!==''&&!isNaN(parseNum(r[h]))).length; if(sc>bVS){bVS=sc;bV=h;} }); impColV=bV; }
+    return;
+  }
+  impSummary=false;
   const mesExact=['MES','MONTH','PERIODO','MONTH NAME','NOMBRE MES'];
   impColM=impHeaders.find((_,i)=>mesExact.includes(hn[i]))||impHeaders.find(h=>{ const s=impRows.slice(0,15).map(r=>nrm(String(r[h]))); return s.filter(v=>v in MES_MAP||Object.keys(MES_MAP).some(k=>v.startsWith(k))).length>=3; })||'';
   impMulti=!!impColM;
@@ -786,6 +799,29 @@ function parseMes(v){
   const n=parseInt(s); if(!isNaN(n)&&n>=1&&n<=12)return n-1;
   const d=new Date(v); if(!isNaN(d.getTime()))return d.getMonth(); return null;
 }
+// Mapeo CUENTA (resumen) → BUDGET concepto único
+const CUENTA_MAP={
+  'SERVICIOS TELEFONO':'MOVISTAR',
+  'ANULACION DE PRIMAS DE CREDITOS':'ANULACIONES EMISION',
+  'ANULACION PRIMAS CREDITO':'ANULACIONES EMISION',
+  'CAPACITACION':'CAPACITACION',
+  'DONACIONES':'DONACIONES',
+  'SISTEMAS':'HORAS DC',
+  // GASTOS COMERCIALES → se omite (usar CSV detallado)
+};
+
+// Distribuye un total real proporcionalmente al presupuesto mensual
+function distribuirPorMes(concepto, totalReal, upTo){
+  const b=BUDGET.find(b=>b.concepto===concepto); if(!b||!totalReal) return Array(12).fill(null);
+  const result=Array(12).fill(null);
+  const slice=b.m.slice(0,upTo+1);
+  const budgSum=slice.reduce((s,v)=>s+(v||0),0);
+  for(let i=0;i<=upTo;i++){
+    result[i]=budgSum>0 ? totalReal*(b.m[i]||0)/budgSum : totalReal/(upTo+1);
+  }
+  return result;
+}
+
 // TIPO DE CUENTA values in PowerBI that map to existing BUDGET concepts
 const TIPO_ALIASES={
   'PASAJES':'MOVILIDAD COMERCIAL',
@@ -814,6 +850,18 @@ function matchConceptoFull(rc,rm){
 }
 
 function renderColSel(){
+  if(impSummary){
+    const mesOpts=MF.map((m,i)=>`<option value="${i}" ${i===impSummaryMonth?'selected':''}>${m}</option>`).join('');
+    document.getElementById('colSel').innerHTML=`
+      <div><div class="alert info" style="margin-bottom:0">📊 <strong>Formato resumen por Cuenta detectado.</strong> Los totales se distribuyen por mes según el presupuesto. GASTOS COMERCIALES se omite (importá el CSV detallado por separado).</div></div>
+      <div><div style="font-size:10px;color:var(--muted);font-weight:700;margin-bottom:3px">COLUMNA REAL IMPORTE</div>
+        <select class="big" onchange="impColV=this.value;renderImpPreview()">${impHeaders.map(h=>`<option value="${h}" ${h===impColV?'selected':''}>${h}</option>`).join('')}</select></div>
+      <div><div style="font-size:10px;color:var(--muted);font-weight:700;margin-bottom:3px">PERÍODO CUBIERTO HASTA</div>
+        <select class="big" onchange="impSummaryMonth=+this.value;renderImpPreview()">${mesOpts}</select></div>
+    `;
+    document.getElementById('stepMes').style.display='none';
+    return;
+  }
   const mesOpts='<option value="">— ninguna —</option>'+impHeaders.map(h=>`<option value="${h}" ${h===impColM?'selected':''}>${h}</option>`).join('');
   document.getElementById('colSel').innerHTML=`
     <div><div style="font-size:10px;color:var(--muted);font-weight:700;margin-bottom:3px">TIPO/CONCEPTO</div>
@@ -828,7 +876,9 @@ function renderColSel(){
 }
 
 function renderImpPreview(){
-  if(impMulti) renderPreviewMulti(); else renderPreviewSingle();
+  if(impSummary) renderPreviewSummary();
+  else if(impMulti) renderPreviewMulti();
+  else renderPreviewSingle();
 }
 
 function renderPreviewSingle(){
@@ -857,9 +907,41 @@ function renderPreviewMulti(){
   else{ showImpAlert(`✅ <strong>${meses.length} ${meses.length===1?'mes':'meses'}:</strong> ${meses.map(m=>MF[m]).join(', ')}.${unk.size>0?' <span style="color:var(--orange)">'+unk.size+' tipos sin coincidencia.</span>':''}`, 'ok'); document.getElementById('impSaveBtn').style.display=''; document.getElementById('impSaveBtn').textContent='✓ Guardar todos los meses ('+meses.length+')'; window._impByMes=byMes; window._impMode='multi'; }
 }
 
+function renderPreviewSummary(){
+  const mapped=[]; let totalReal=0;
+  impRows.forEach(r=>{
+    const cuenta=nrm(String(r[impColC]||'')); const vv=parseNum(r[impColV]);
+    if(!cuenta||isNaN(vv)||vv===0) return;
+    if(cuenta==='GASTOS COMERCIALES') return; // skip — usar CSV detallado
+    const conceptoNm=CUENTA_MAP[cuenta];
+    if(conceptoNm){ const b=BUDGET.find(b=>b.concepto===conceptoNm); if(b){ mapped.push({cuenta,concepto:conceptoNm,real:vv}); totalReal+=vv; } }
+  });
+  const upTo=impSummaryMonth;
+  let html=`<table><tr><th>Cuenta</th><th>Concepto presupuesto</th><th>Real total</th><th>Distribución</th></tr>`;
+  mapped.forEach(m=>{
+    const dist=distribuirPorMes(m.concepto,m.real,upTo);
+    const distStr=dist.slice(0,upTo+1).map((v,i)=>v?MN[i]+' $'+fmt(v):'').filter(Boolean).join(' · ');
+    html+=`<tr><td style="color:var(--muted)">${m.cuenta}</td><td class="m">${m.concepto}</td><td style="font-weight:700">$${fmt(m.real)}</td><td style="font-size:10px;color:var(--muted)">${distStr}</td></tr>`;
+  });
+  html+=`<tr style="border-top:2px solid var(--border)"><td colspan="2" style="font-weight:700">Total importado</td><td style="font-weight:800;color:var(--blue)">$${fmt(totalReal)}</td><td style="font-size:10px;color:var(--muted)">Ene → ${MF[upTo]}</td></tr>`;
+  html+='</table>';
+  document.getElementById('impPreview').innerHTML=html;
+  if(!mapped.length){ showImpAlert('⚠️ No se reconoció ninguna CUENTA. Verificá la columna seleccionada.','warn'); document.getElementById('impSaveBtn').style.display='none'; }
+  else{ showImpAlert(`✅ <strong>${mapped.length} cuentas</strong> detectadas (Ene → ${MF[upTo]}). GASTOS COMERCIALES se omite.`,'ok'); document.getElementById('impSaveBtn').style.display=''; document.getElementById('impSaveBtn').textContent=`✓ Guardar ${mapped.length} conceptos (Ene–${MN[upTo]})`; window._impSummaryMapped=mapped; window._impMode='summary'; }
+}
+
 function showImpAlert(msg,type){ document.getElementById('impAlert').innerHTML=`<div class="alert ${type}">${msg}</div>`; }
 
 function saveImport(){
+  if(window._impMode==='summary'){
+    const upTo=impSummaryMonth;
+    (window._impSummaryMapped||[]).forEach(({concepto,real})=>{
+      const dist=distribuirPorMes(concepto,real,upTo);
+      if(!REAL[concepto])REAL[concepto]=Array(12).fill(null);
+      dist.forEach((v,i)=>{ if(v!==null) REAL[concepto][i]=Math.round(v); });
+    });
+    saveReal(REAL); closeImport(); refreshAll(); return;
+  }
   if(window._impMode==='multi'){
     Object.entries(window._impByMes||{}).forEach(([mi,cs])=>{ Object.entries(cs).forEach(([c,v])=>{ if(!REAL[c])REAL[c]=Array(12).fill(null); REAL[c][+mi]=v; }); });
   } else {
