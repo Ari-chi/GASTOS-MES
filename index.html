@@ -766,7 +766,7 @@ function autoDetectCols(){
   const concExact=['TIPO DE CUENTA','TIPO CUENTA','TIPODECUENTA','CONCEPTO','TIPO','CATEGORY'];
   impColC=impHeaders.find((_,i)=>concExact.includes(hn[i]))||'';
   if(!impColC){ const all=[...BUDGET.map(b=>b.concepto.toLowerCase()),...BUDGET.map(b=>b.tipo.toLowerCase())]; let bC='',bS=0; impHeaders.forEach(h=>{ const sc=impRows.slice(0,50).filter(r=>{ const v=String(r[h]).toLowerCase().trim(); return all.some(n=>v.includes(n.slice(0,5))||n.includes(v.slice(0,5))); }).length; if(sc>bS){bS=sc;bC=h;} }); impColC=bC||impHeaders.find(h=>isNaN(+impRows[0]?.[h]))||impHeaders[0]; }
-  const valExact=['IMPORTE','AMOUNT','MONTO','VALOR','TOTAL'];
+  const valExact=['IMPORTE','AMOUNT','MONTO','VALOR','TOTAL','SUMA DE IMPORTE','REAL IMPORTE','SUM OF AMOUNT'];
   impColV=impHeaders.find((_,i)=>valExact.includes(hn[i]))||'';
   if(!impColV){ const skip=new Set([impColC,impColM,impColMon]); let bV='',bVS=0; impHeaders.forEach(h=>{ if(skip.has(h))return; const sc=impRows.slice(0,50).filter(r=>r[h]!==''&&!isNaN(parseNum(r[h]))).length; if(sc>bVS){bVS=sc;bV=h;} }); impColV=bV||impHeaders.find(h=>h!==impColC)||impHeaders[1]; }
 }
@@ -786,13 +786,30 @@ function parseMes(v){
   const n=parseInt(s); if(!isNaN(n)&&n>=1&&n<=12)return n-1;
   const d=new Date(v); if(!isNaN(d.getTime()))return d.getMonth(); return null;
 }
+// TIPO DE CUENTA values in PowerBI that map to existing BUDGET concepts
+const TIPO_ALIASES={
+  'PASAJES':'MOVILIDAD COMERCIAL',
+  'PASAJES AEREOS':'MOVILIDAD COMERCIAL',
+  'PASAJES TERRESTRES':'MOVILIDAD COMERCIAL',
+  'AUTOMOVIL':'ALQUILER VEHICULO',
+  'ALMUERZOS OFICINA':'ALMUERZOS COMERCIALES',
+};
 function matchConceptoFull(rc,rm){
   if(!rc)return null; const rv=nrm(rc); const mon=rm?nrm(String(rm)).trim():null;
+  // 1. Exact match on concepto name
   let m=BUDGET.find(b=>nrm(b.concepto)===rv); if(m)return m;
+  // 2. Exact match on tipo — when ambiguous, prefer ARS (sin MONEDA columna = gastos nacionales)
   const tm=BUDGET.filter(b=>nrm(b.tipo)===rv);
   if(tm.length===1)return tm[0];
-  if(tm.length>1){ if(mon){const bm=tm.find(b=>b.moneda===mon);if(bm)return bm;} return tm[0]; }
+  if(tm.length>1){
+    if(mon){const bm=tm.find(b=>b.moneda===mon);if(bm)return bm;}
+    const ars=tm.find(b=>b.moneda==='ARS'); return ars||tm[0];
+  }
+  // 3. Aliases explícitos para TIPO DE CUENTA de PowerBI
+  const alias=TIPO_ALIASES[rv]; if(alias){ m=BUDGET.find(b=>nrm(b.concepto)===alias); if(m)return m; }
+  // 4. Partial match on concepto
   m=BUDGET.find(b=>rv.startsWith(nrm(b.concepto).slice(0,5))||nrm(b.concepto).startsWith(rv.slice(0,5))); if(m)return m;
+  // 5. Partial match on tipo
   m=BUDGET.find(b=>{ const bt=nrm(b.tipo); return rv.includes(bt.slice(0,6))||bt.includes(rv.slice(0,6)); }); return m||null;
 }
 
@@ -816,7 +833,7 @@ function renderImpPreview(){
 
 function renderPreviewSingle(){
   const matched=[],unmatched=[];
-  impRows.forEach(r=>{ const rv=r[impColC]; const vv=parseNum(r[impColV]); const mon=impColMon?r[impColMon]:null; const b=matchConceptoFull(rv,mon); if(b&&!isNaN(vv)&&vv>0)matched.push({concepto:b.concepto,rawName:rv,valor:vv}); else if(rv&&rv!=='')unmatched.push({rawName:rv,valor:r[impColV]}); });
+  impRows.forEach(r=>{ const rv=r[impColC]; const vv=parseNum(r[impColV]); const mon=impColMon?r[impColMon]:null; const b=matchConceptoFull(rv,mon); if(b&&!isNaN(vv)&&vv!==0)matched.push({concepto:b.concepto,rawName:rv,valor:vv}); else if(rv&&rv!=='')unmatched.push({rawName:rv,valor:r[impColV]}); });
   const ms=new Set(matched.map(m=>m.concepto)); const miss=BUDGET.filter(b=>!ms.has(b.concepto));
   let html=`<table><tr><th>Concepto presupuesto</th><th>Nombre en archivo</th><th>Valor</th><th></th></tr>`;
   matched.forEach(m=>{html+=`<tr><td class="m">${m.concepto}</td><td style="color:var(--muted)">${m.rawName}</td><td style="font-weight:600">$${fmt(m.valor)}</td><td>✅</td></tr>`;});
