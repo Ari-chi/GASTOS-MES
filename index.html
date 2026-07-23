@@ -146,6 +146,7 @@ footer{text-align:center;padding:18px;color:var(--muted2);font-size:11px;border-
     <span class="badge warn" id="statusBadge"><span class="dot"></span><span id="statusTxt">SIN REAL</span></span>
     <button class="btn ghost" onclick="openImport()">↑ Subir archivo</button>
     <button class="btn primary" onclick="openModal()">+ Cargar manual</button>
+    <button class="btn clear sm" onclick="confirmClear()" title="Borrar todos los datos reales">🗑</button>
   </div>
 </header>
 
@@ -695,6 +696,12 @@ function clearMonth(){
 const MES_MAP={'ENERO':0,'FEBRERO':1,'MARZO':2,'ABRIL':3,'MAYO':4,'JUNIO':5,'JULIO':6,'AGOSTO':7,'SEPTIEMBRE':8,'OCTUBRE':9,'NOVIEMBRE':10,'DICIEMBRE':11,'ENE':0,'FEB':1,'MAR':2,'ABR':3,'MAY':4,'JUN':5,'JUL':6,'AGO':7,'SEP':8,'OCT':9,'NOV':10,'DIC':11,'JANUARY':0,'FEBRUARY':1,'MARCH':2,'APRIL':3,'JUNE':5,'JULY':6,'AUGUST':7,'SEPTEMBER':8,'OCTOBER':9,'NOVEMBER':10,'DECEMBER':11};
 
 let impRows=[],impHeaders=[],impColC='',impColV='',impColM='',impColMon='',impMulti=false,impSummary=false,impSummaryMonth=5;
+
+function confirmClear(){
+  if(confirm('¿Borrar todos los datos reales cargados? Esto no se puede deshacer.\n\nLos presupuestos no se modifican.')){
+    REAL={}; saveReal(REAL); refreshAll();
+  }
+}
 
 function openImport(){
   const m=new Date().getMonth();
